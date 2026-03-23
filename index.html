@@ -943,6 +943,58 @@ function drawBubble(ctx,x,y,r,fillCol,strokeCol){
 }
 
 // ═══════════════════════════════════════════════════════
+// ─── INGREDIENT & SCENE ICON HELPERS (shared) ───
+function rr_local(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);ctx.closePath();
+}
+function drawIngIcon(ctx,x,y,r,name,accentCol){
+  ctx.save();ctx.translate(x,y);const n=name||'';
+  if(/水|玻尿|保濕|濕|津|露/.test(n)){
+    ctx.fillStyle=accentCol+'CC';ctx.beginPath();ctx.moveTo(0,-r*.6);
+    ctx.bezierCurveTo(r*.5,-r*.1,r*.5,r*.4,0,r*.6);ctx.bezierCurveTo(-r*.5,r*.4,-r*.5,-r*.1,0,-r*.6);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.ellipse(-r*.15,-r*.15,r*.1,r*.18,-.5,0,Math.PI*2);ctx.fill();
+  } else if(/膠原|蛋白|胜肽|肽|胺/.test(n)){
+    ctx.strokeStyle=accentCol+'DD';ctx.lineWidth=r*.12;ctx.lineCap='round';
+    for(let i=0;i<3;i++){ctx.beginPath();ctx.arc(0,0,r*(0.28+i*.14),(i*.6-1.2),(i*.6+.8));ctx.stroke();}
+    for(let i=0;i<6;i++){const a2=i/6*Math.PI*2;ctx.fillStyle=accentCol;ctx.beginPath();ctx.arc(Math.cos(a2)*r*.42,Math.sin(a2)*r*.42,r*.07,0,Math.PI*2);ctx.fill();}
+  } else if(/黃金|金|24K|Au/.test(n)){
+    ctx.fillStyle=accentCol+'BB';ctx.beginPath();
+    for(let i=0;i<6;i++){const a2=i/6*Math.PI*2-Math.PI/6;i===0?ctx.moveTo(Math.cos(a2)*r*.55,Math.sin(a2)*r*.55):ctx.lineTo(Math.cos(a2)*r*.55,Math.sin(a2)*r*.55);}
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.3)';ctx.beginPath();
+    for(let i=0;i<6;i++){const a2=i/6*Math.PI*2-Math.PI/6;i===0?ctx.moveTo(Math.cos(a2)*r*.3,Math.sin(a2)*r*.3):ctx.lineTo(Math.cos(a2)*r*.3,Math.sin(a2)*r*.3);}
+    ctx.closePath();ctx.fill();
+  } else if(/竹|炭|碳/.test(n)){
+    ctx.fillStyle=accentCol+'99';ctx.strokeStyle=accentCol+'CC';ctx.lineWidth=r*.08;
+    [-r*.28,0,r*.28].forEach(yy=>{const w2=r*.36;rr_local(ctx,-w2/2,yy-r*.14,w2,r*.28,r*.06);ctx.fill();ctx.stroke();});
+    ctx.strokeStyle=accentCol+'55';ctx.lineWidth=r*.05;ctx.beginPath();ctx.moveTo(0,-r*.6);ctx.lineTo(0,r*.6);ctx.stroke();
+  } else if(/玫瑰|薔薇|花|牡丹|菊/.test(n)){
+    for(let p=0;p<5;p++){const pa=p/5*Math.PI*2;ctx.fillStyle=accentCol+(p%2===0?'BB':'88');ctx.beginPath();ctx.ellipse(Math.cos(pa)*r*.28,Math.sin(pa)*r*.28,r*.22,r*.15,pa,0,Math.PI*2);ctx.fill();}
+    ctx.fillStyle=accentCol+'EE';ctx.beginPath();ctx.arc(0,0,r*.18,0,Math.PI*2);ctx.fill();
+  } else if(/藻|海草|珊瑚|海/.test(n)){
+    ctx.strokeStyle=accentCol+'CC';ctx.lineWidth=r*.1;ctx.lineCap='round';
+    [-r*.22,0,r*.22].forEach(xx=>{ctx.beginPath();ctx.moveTo(xx,r*.5);ctx.bezierCurveTo(xx+r*.2,r*.2,xx-r*.2,-r*.1,xx+r*.15,-r*.4);ctx.bezierCurveTo(xx+r*.35,-r*.55,xx+r*.1,-r*.62,xx,-r*.5);ctx.stroke();});
+  } else if(/維他命|維生素|VC|VE|VA|菸鹼/.test(n)){
+    ctx.fillStyle=accentCol+'AA';ctx.beginPath();ctx.ellipse(0,0,r*.55,r*.35,-.3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.25)';ctx.beginPath();ctx.ellipse(-r*.1,-r*.08,r*.22,r*.14,-.3,0,Math.PI);ctx.fill();
+    ctx.strokeStyle=accentCol+'EE';ctx.lineWidth=r*.07;ctx.beginPath();ctx.moveTo(-r*.55*Math.cos(.3),r*.35*Math.sin(.3));ctx.lineTo(r*.55*Math.cos(.3),-r*.35*Math.sin(.3));ctx.stroke();
+  } else if(/草|植物|萃取|葉|綠|茶|蘆薈|薑/.test(n)){
+    ctx.fillStyle=accentCol+'AA';ctx.beginPath();ctx.moveTo(0,r*.55);ctx.bezierCurveTo(r*.45,r*.2,r*.45,-r*.3,0,-r*.55);ctx.bezierCurveTo(-r*.45,-r*.3,-r*.45,r*.2,0,r*.55);ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=r*.05;ctx.beginPath();ctx.moveTo(0,r*.5);ctx.lineTo(0,-r*.5);ctx.stroke();
+    for(let i=1;i<4;i++){const fy=r*(.35-i*.25);ctx.beginPath();ctx.moveTo(0,fy);ctx.lineTo(r*.28,fy-r*.1);ctx.stroke();ctx.beginPath();ctx.moveTo(0,fy);ctx.lineTo(-r*.28,fy-r*.1);ctx.stroke();}
+  } else {
+    const dg=ctx.createRadialGradient(-r*.2,-r*.2,0,0,0,r*.5);
+    dg.addColorStop(0,'rgba(255,255,255,0.6)');dg.addColorStop(.6,accentCol+'88');dg.addColorStop(1,accentCol+'44');
+    ctx.fillStyle=dg;ctx.beginPath();ctx.arc(0,0,r*.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';ctx.beginPath();ctx.ellipse(-r*.15,-r*.15,r*.12,r*.08,-.5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
 // IMAGE 1 ── 電影海報式主圖
 // 全出血背景色塊分割，產品超大居中，底部斜切色帶，
 // 品牌名超大字作為底紋水印，強烈視覺衝擊
