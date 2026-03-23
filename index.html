@@ -624,7 +624,12 @@ async function analyze(ltxt,ttxt,limg){
   "dreamScene":"使用後美好場景20字內",
   "skinType":"適合膚質",
   "usage":"使用方式15字內",
-  "spec":"規格說明，如30ml/50g/30入"
+  "spec":"規格說明，如30ml/50g/30入",
+  "painPoints":[
+    {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"},
+    {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"},
+    {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"}
+  ]
 }`});
   const key=getKey();
   if(!key){throw new Error('請先輸入 Anthropic API Key');}
@@ -922,88 +927,226 @@ async function drawImg1(src,a,style,opts){
 }
 
 // ─── IMAGE 2: Ingredient radial map ───
+// ── 場景插圖（根據 icon 關鍵字繪製）
+function drawSceneIcon(ctx,cx,cy,r,iconKey,col){
+  ctx.save();ctx.translate(cx,cy);
+  switch(iconKey){
+    case 'eye':
+      ctx.strokeStyle=col+'CC';ctx.lineWidth=r*.1;
+      ctx.beginPath();ctx.moveTo(-r*.6,0);ctx.quadraticCurveTo(0,-r*.52,r*.6,0);ctx.quadraticCurveTo(0,r*.52,-r*.6,0);ctx.stroke();
+      const ig=ctx.createRadialGradient(0,0,0,0,0,r*.24);ig.addColorStop(0,col);ig.addColorStop(1,col+'44');
+      ctx.fillStyle=ig;ctx.beginPath();ctx.arc(0,0,r*.24,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='#111';ctx.beginPath();ctx.arc(0,0,r*.1,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.6)';ctx.beginPath();ctx.ellipse(-r*.08,-r*.08,r*.05,r*.03,-.5,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=col+'44';ctx.beginPath();ctx.ellipse(0,r*.18,r*.5,r*.08,0,0,Math.PI*2);ctx.fill();
+      break;
+    case 'water':
+      ctx.fillStyle=col+'BB';ctx.beginPath();ctx.moveTo(0,-r*.6);ctx.bezierCurveTo(r*.5,-r*.1,r*.5,r*.38,0,r*.58);ctx.bezierCurveTo(-r*.5,r*.38,-r*.5,-r*.1,0,-r*.6);ctx.fill();
+      ctx.strokeStyle=col+'44';ctx.lineWidth=r*.06;ctx.setLineDash([r*.06,r*.08]);
+      [[-r*.18,r*.05],[r*.1,-r*.1],[-r*.05,r*.22]].forEach(([lx,ly])=>{ctx.beginPath();ctx.moveTo(lx,ly);ctx.lineTo(lx+r*.15,ly+r*.15);ctx.stroke();});
+      ctx.setLineDash([]);
+      ctx.fillStyle='rgba(255,255,255,0.3)';ctx.beginPath();ctx.ellipse(-r*.14,-r*.18,r*.08,r*.16,-.4,0,Math.PI*2);ctx.fill();
+      break;
+    case 'dark':
+      ctx.strokeStyle=col+'66';ctx.lineWidth=r*.08;ctx.beginPath();ctx.ellipse(0,-r*.08,r*.38,r*.46,0,0,Math.PI*2);ctx.stroke();
+      [-r*.18,r*.18].forEach(ex=>{ctx.fillStyle=col+'55';ctx.beginPath();ctx.ellipse(ex,r*.05,r*.13,r*.055,0,0,Math.PI*2);ctx.fill();});
+      ctx.fillStyle=col+'33';for(let i=0;i<8;i++){ctx.beginPath();ctx.arc((-0.3+Math.random()*.6)*r*1.2,(-0.1+Math.random()*.4)*r*1.2,2+Math.random()*5,0,Math.PI*2);ctx.fill();}
+      break;
+    case 'wrinkle':
+      ctx.strokeStyle=col+'55';ctx.lineWidth=r*.07;
+      for(let i=0;i<5;i++){const y0=(-0.35+i*.17)*r*1.4;ctx.beginPath();ctx.moveTo(-r*.6,y0);for(let x=-r*.6;x<r*.6;x+=r*.15){ctx.lineTo(x,y0+(-r*.06+Math.random()*r*.12));}ctx.lineTo(r*.6,y0);ctx.stroke();}
+      ctx.strokeStyle=col+'AA';ctx.lineWidth=r*.09;ctx.beginPath();ctx.moveTo(-r*.3,-r*.05);ctx.quadraticCurveTo(0,-r*.18,r*.3,-r*.05);ctx.stroke();
+      break;
+    case 'pore':
+      [[0,0,r*.14],[r*.28,-r*.18,r*.09],[-r*.22,r*.14,r*.11],[r*.1,r*.28,r*.07],[-r*.32,-r*.25,r*.08]].forEach(([px,py,pr])=>{
+        ctx.fillStyle=col+'55';ctx.beginPath();ctx.ellipse(px,py,pr,pr*.7,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=col+'77';ctx.lineWidth=r*.05;ctx.beginPath();ctx.ellipse(px,py,pr,pr*.7,0,0,Math.PI*2);ctx.stroke();
+      });
+      ctx.strokeStyle=col+'88';ctx.lineWidth=r*.08;ctx.beginPath();ctx.arc(0,0,r*.42,0,Math.PI*2);ctx.stroke();
+      break;
+    case 'tired':
+      ctx.fillStyle=col+'CC';ctx.beginPath();ctx.arc(-r*.12,0,r*.45,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(0,0,0,0.5)';ctx.beginPath();ctx.arc(r*.12,-r*.05,r*.38,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.12)';for(let i=0;i<6;i++){ctx.beginPath();ctx.arc((-0.5+Math.random())*r*1.6,(-0.5+Math.random())*r*1.6,Math.random()*r*.06,0,Math.PI*2);ctx.fill();}
+      ctx.strokeStyle=col+'99';ctx.lineWidth=r*.1;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(-r*.5,r*.35);ctx.quadraticCurveTo(0,r*.55,r*.5,r*.35);ctx.stroke();
+      break;
+    case 'sun':
+      ctx.fillStyle=col+'BB';ctx.beginPath();ctx.arc(0,0,r*.38,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=col+'88';ctx.lineWidth=r*.07;ctx.lineCap='round';
+      for(let i=0;i<8;i++){const a=i/8*Math.PI*2;ctx.beginPath();ctx.moveTo(Math.cos(a)*r*.5,Math.sin(a)*r*.5);ctx.lineTo(Math.cos(a)*r*.68,Math.sin(a)*r*.68);ctx.stroke();}
+      ctx.fillStyle='rgba(255,255,255,0.25)';ctx.beginPath();ctx.arc(-r*.1,-r*.1,r*.12,0,Math.PI*2);ctx.fill();
+      break;
+    case 'glow':
+      ctx.strokeStyle=col+'44';ctx.lineWidth=r*.07;ctx.beginPath();ctx.ellipse(0,0,r*.38,r*.48,0,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle=col+'66';ctx.lineWidth=r*.05;ctx.setLineDash([r*.08,r*.06]);ctx.beginPath();ctx.ellipse(0,0,r*.52,r*.62,0,0,Math.PI*2);ctx.stroke();ctx.setLineDash([]);
+      const gg=ctx.createRadialGradient(0,0,0,0,0,r*.2);gg.addColorStop(0,col+'CC');gg.addColorStop(1,col+'22');
+      ctx.fillStyle=gg;ctx.beginPath();ctx.arc(0,0,r*.2,0,Math.PI*2);ctx.fill();
+      break;
+    case 'firm':
+      ctx.strokeStyle=col+'BB';ctx.lineWidth=r*.09;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(-r*.42,-r*.38);ctx.quadraticCurveTo(-r*.5,r*.15,0,r*.52);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(r*.42,-r*.38);ctx.quadraticCurveTo(r*.5,r*.15,0,r*.52);ctx.stroke();
+      [[-r*.28,r*.05],[r*.28,r*.05]].forEach(([ax,ay])=>{
+        ctx.strokeStyle=col+'66';ctx.lineWidth=r*.07;
+        ctx.beginPath();ctx.moveTo(ax,ay+r*.18);ctx.lineTo(ax,ay-r*.18);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ax-r*.1,ay-r*.08);ctx.lineTo(ax,ay-r*.2);ctx.lineTo(ax+r*.1,ay-r*.08);ctx.stroke();
+      });
+      break;
+    default: // clean
+      ctx.strokeStyle=col+'AA';ctx.lineWidth=r*.08;ctx.beginPath();ctx.arc(0,r*.08,r*.42,0,Math.PI*2);ctx.stroke();
+      [[-.38,-.25,.14],[.28,-.18,.11],[-.08,-.44,.09],[.2,.35,.08]].forEach(([bx,by,br])=>{ctx.strokeStyle=col+'66';ctx.lineWidth=r*.05;ctx.beginPath();ctx.arc(bx*r,by*r,br*r,0,Math.PI*2);ctx.stroke();});
+  }
+  ctx.restore();
+}
+
 async function drawImg2(src,a,style,opts){
   const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
   const img=await loadImg(src);
-  const ings=(a.ingredients||[]).slice(0,6);
-  th.bg(ctx,SZ);
-  if(opts.particles)drawParticles(ctx,th.accent+'1A');
-  drawDecoLeaves(ctx,th,6);
+  const S=SZ;
+  const isDark=th.titleStyle==='light';
 
-  // Title
-  ctx.save();ctx.textAlign='center';
-  ctx.font=`700 ${27}px 'Noto Serif TC',serif`;
-  ctx.fillStyle=th.textDark;
-  ctx.fillText('【'+a.productName+'】成分解析',SZ/2,SZ*.072);
-  if(opts.tagline){
-    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
-    ctx.fillStyle=th.accent;ctx.fillText(a.tagline||'奢華配方',SZ/2,SZ*.104);
+  // 痛點資料（AI提供或預設）
+  const pps=(a.painPoints||[]).slice(0,3);
+  while(pps.length<3){
+    pps.push([
+      {title:'眼周暗沉',desc:'熬夜造成眼周暗沉無光',scene:'工作加班後',icon:'eye'},
+      {title:'乾燥缺水',desc:'環境乾燥肌膚缺水脫屑',scene:'秋冬季節',icon:'water'},
+      {title:'細紋困擾',desc:'眼周細紋隨年齡漸現',scene:'保養不足時',icon:'wrinkle'},
+    ][pps.length]);
   }
+
+  // 背景
+  th.bg(ctx,S);
+  if(opts.particles)drawParticles(ctx,th.accent+'18');
+
+  // 頂部標題帶
+  ctx.save();
+  const hg=ctx.createLinearGradient(0,0,0,S*.15);
+  hg.addColorStop(0,th.accent+'22');hg.addColorStop(1,'transparent');
+  ctx.fillStyle=hg;ctx.fillRect(0,0,S,S*.15);
   ctx.restore();
-  ornLine(ctx,SZ*.16,SZ*.12,SZ*.84,SZ*.12,th.accent+'55');
 
-  // Product center
-  fitProd(ctx,img,SZ/2,SZ*.52,380,380);
+  ctx.save();ctx.textAlign='center';
+  ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=th.accent+'88';
+  ctx.fillText('依洛嘉國際  ·  解決您的肌膚困擾',S*.5,S*.052);
+  ctx.font=`600 ${22}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.textDark;
+  ctx.fillText((a.productName||'產品')+'  ·  三大場景應用',S*.5,S*.105);
+  ctx.restore();
+  ornLine(ctx,S*.15,S*.128,S*.85,S*.128,th.accent+'44');
 
-  // Positions for up to 6 ingredients
-  const poss=[
-    {x:SZ*.17,y:SZ*.26,align:'right'},
-    {x:SZ*.83,y:SZ*.26,align:'left'},
-    {x:SZ*.14,y:SZ*.52,align:'right'},
-    {x:SZ*.86,y:SZ*.52,align:'left'},
-    {x:SZ*.17,y:SZ*.78,align:'right'},
-    {x:SZ*.83,y:SZ*.78,align:'left'},
-  ];
+  // 三格主體
+  const cellW=Math.floor(S/3);
+  const cellTop=S*.14;
+  const cellBot=S*.86;
+  const cellH=cellBot-cellTop;
 
-  ings.forEach((ing,i)=>{
-    if(i>=poss.length)return;
-    const pos=poss[i];
-    const isR=pos.align==='right';
-    const bx=isR?pos.x+SZ*.045:pos.x-SZ*.045;
+  pps.forEach((pp,i)=>{
+    const cx=i*cellW;
+    const ccx=cx+cellW/2;
 
-    // Radial line to center
-    if(opts.radial){
+    // 格子背景
+    ctx.save();
+    ctx.fillStyle=i===1
+      ?(isDark?'rgba(255,255,255,0.05)':'rgba(196,153,42,0.08)')
+      :(isDark?'rgba(255,255,255,0.02)':'rgba(196,153,42,0.04)');
+    ctx.fillRect(cx,cellTop,cellW,cellH);
+
+    // 中格頂底線強調
+    if(i===1){
+      ctx.strokeStyle=th.accent+'55';ctx.lineWidth=1.2;
+      ctx.beginPath();ctx.moveTo(cx,cellTop);ctx.lineTo(cx+cellW,cellTop);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(cx,cellBot);ctx.lineTo(cx+cellW,cellBot);ctx.stroke();
+    }
+    ctx.restore();
+
+    // 垂直分隔線
+    if(i>0){
       ctx.save();
-      ctx.strokeStyle=th.accent+'3A';ctx.lineWidth=.9;ctx.setLineDash([4,6]);
-      ctx.beginPath();
-      ctx.moveTo(isR?pos.x+SZ*.09:pos.x-SZ*.09,pos.y);
-      ctx.lineTo(SZ*(isR?.38:.62),SZ*.52);ctx.stroke();
+      const dvg=ctx.createLinearGradient(cx,cellTop,cx,cellBot);
+      dvg.addColorStop(0,'transparent');dvg.addColorStop(.3,th.accent+'44');
+      dvg.addColorStop(.7,th.accent+'44');dvg.addColorStop(1,'transparent');
+      ctx.strokeStyle=dvg;ctx.lineWidth=1;
+      ctx.beginPath();ctx.moveTo(cx,cellTop);ctx.lineTo(cx,cellBot);ctx.stroke();
       ctx.restore();
     }
 
-    // Bubble icon
-    if(opts.icons){
-      drawBubble(ctx,bx,pos.y,SZ*.05,th.accent+'22',th.accent+'66');
-      ctx.save();
-      ctx.font=`400 ${22}px serif`;
-      ctx.fillStyle=th.accent;ctx.textAlign='center';
-      ctx.fillText(ing.symbolChar||'◈',bx,pos.y+SZ*.008);
-      ctx.restore();
-    }
+    // 編號
+    ctx.save();
+    ctx.font=`300 ${24}px 'Cormorant Garamond',serif`;
+    ctx.fillStyle=th.accent+'55';ctx.textAlign='left';
+    ctx.fillText('0'+(i+1),cx+S*.022,cellTop+S*.055);
+    ctx.restore();
 
-    // Text
-    ctx.save();ctx.textAlign=pos.align;
-    ctx.font=`600 ${18}px 'Noto Serif TC',serif`;
+    // 插圖區（格子上半）
+    const iconCY=cellTop+cellH*.36;
+    const iconR=S*.078;
+
+    // 光暈
+    ctx.save();
+    const ig=ctx.createRadialGradient(ccx,iconCY,0,ccx,iconCY,iconR*1.5);
+    ig.addColorStop(0,th.accent+(i===1?'28':'1A'));ig.addColorStop(1,'transparent');
+    ctx.fillStyle=ig;ctx.fillRect(cx,cellTop,cellW,cellH*.7);
+    ctx.restore();
+
+    // 外圓
+    drawBubble(ctx,ccx,iconCY,iconR,th.accent+(i===1?'20':'14'),th.accent+(i===1?'55':'38'));
+    drawBubble(ctx,ccx,iconCY,iconR*.65,th.accent+'10',th.accent+'22');
+
+    // 場景插圖
+    drawSceneIcon(ctx,ccx,iconCY,iconR,pp.icon||'skin',th.accent);
+
+    // 痛點標題
+    ctx.save();ctx.textAlign='center';
+    ctx.font=`600 ${19}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.textDark;
-    ctx.fillText(ing.name,pos.x,pos.y-SZ*.012);
-    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillText(pp.title||'',ccx,cellTop+cellH*.63);
+    ctx.restore();
+
+    // 細線
+    ctx.save();
+    ctx.strokeStyle=th.accent+'44';ctx.lineWidth=.8;
+    ctx.beginPath();ctx.moveTo(ccx-S*.055,cellTop+cellH*.662);ctx.lineTo(ccx+S*.055,cellTop+cellH*.662);ctx.stroke();
+    ctx.restore();
+
+    // 描述（最多2行）
+    ctx.save();ctx.textAlign='center';
+    ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
     ctx.fillStyle=th.textMid;
-    ctx.fillText(ing.benefit||'',pos.x,pos.y+SZ*.014);
+    const desc=pp.desc||'';
+    if(desc.length<=10){
+      ctx.fillText(desc,ccx,cellTop+cellH*.715);
+    } else {
+      const m=Math.ceil(desc.length/2);
+      ctx.fillText(desc.slice(0,m),ccx,cellTop+cellH*.705);
+      ctx.fillText(desc.slice(m),ccx,cellTop+cellH*.738);
+    }
+    ctx.restore();
+
+    // 場景標籤 pill
+    ctx.save();
+    const tw=S*.17,th2=S*.042,tx=ccx-tw/2,ty=cellTop+cellH*.8;
+    ctx.fillStyle=th.cardBg||'rgba(255,255,255,0.6)';
+    rr(ctx,tx,ty,tw,th2,th2/2);ctx.fill();
+    ctx.strokeStyle=th.accent+'44';ctx.lineWidth=.8;
+    rr(ctx,tx,ty,tw,th2,th2/2);ctx.stroke();
+    ctx.font=`400 ${11}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=th.accent+'CC';ctx.textAlign='center';
+    ctx.fillText(pp.scene||'',ccx,ty+th2*.68);
     ctx.restore();
   });
 
-  // Bottom spec bar
-  if(opts.specbar&&a.spec){
-    ctx.save();
-    ctx.fillStyle=th.cardBg;
-    rr(ctx,SZ*.12,SZ*.9,SZ*.76,SZ*.058,10);ctx.fill();
-    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.7;
-    rr(ctx,SZ*.12,SZ*.9,SZ*.76,SZ*.058,10);ctx.stroke();
-    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
-    ctx.fillStyle=th.textMid;ctx.textAlign='center';
-    ctx.fillText('規格：'+a.spec,SZ/2,SZ*.937);
-    ctx.restore();
-  }
+  // 底部帶
+  ornLine(ctx,S*.08,S*.868,S*.92,S*.868,th.accent+'33');
+  ctx.save();ctx.globalAlpha=.85;
+  fitProd(ctx,img,S*.5,S*.933,S*.1,S*.1);
+  ctx.restore();
+  ctx.save();
+  ctx.font=`300 ${12}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.accent+'77';ctx.textAlign='center';
+  ctx.fillText(a.productName||'',S*.5,S*.972);
+  ctx.restore();
 
   drawBrand(ctx,th);
   drawBorder(ctx,th.borderColor);
