@@ -1,0 +1,859 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>依洛嘉國際 · 展示圖系統 v3</title>
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;500;600;700;900&family=Noto+Sans+TC:wght@300;400;500;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
+<style>
+:root{
+  --g1:#C4992A;--g2:#D4AF50;--g3:#E8C97A;--g4:#F5E4B0;
+  --dark:#1C1408;--mid:#6B5B3E;--light:#A89070;
+  --ivory:#FAF8F2;
+}
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#181208;font-family:'Noto Sans TC',sans-serif;color:#FAF8F2;min-height:100vh}
+
+/* HEADER */
+.hd{text-align:center;padding:2.2rem 2rem 1.5rem;border-bottom:1px solid rgba(196,153,42,.22)}
+.hd-brand{font-family:'Noto Serif TC',serif;font-size:2rem;font-weight:300;letter-spacing:.45em;color:var(--g2)}
+.hd-sub{font-size:.62rem;letter-spacing:.28em;color:var(--light);text-transform:uppercase;margin-top:.25rem}
+.hd-cr{font-size:.58rem;color:rgba(168,144,112,.4);margin-top:.35rem}
+
+/* LAYOUT */
+.layout{display:grid;grid-template-columns:380px 1fr;min-height:calc(100vh - 130px)}
+.lp{border-right:1px solid rgba(196,153,42,.15);padding:1.6rem;display:flex;flex-direction:column;gap:1.2rem;overflow-y:auto}
+.rp{padding:1.8rem;overflow-y:auto}
+
+/* SECTIONS */
+.sec{background:rgba(255,255,255,.025);border:1px solid rgba(196,153,42,.14);border-radius:12px;padding:1.2rem}
+.sec-lbl{font-size:.58rem;letter-spacing:.22em;color:var(--g2);text-transform:uppercase;margin-bottom:.85rem;display:flex;align-items:center;gap:.5rem}
+.sec-lbl::after{content:'';flex:1;height:1px;background:rgba(196,153,42,.18)}
+
+/* UPLOAD */
+.upz{border:1.5px dashed rgba(196,153,42,.3);border-radius:10px;padding:1.4rem;text-align:center;cursor:pointer;transition:.25s;position:relative}
+.upz:hover{border-color:var(--g2);background:rgba(196,153,42,.05)}
+.upz input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
+.upz-ico{width:34px;height:34px;margin:0 auto .6rem;opacity:.4}
+.upz-txt{font-size:.72rem;color:var(--light);line-height:1.6}
+.prev{width:100%;max-height:150px;object-fit:contain;display:none;margin-top:.6rem;border-radius:8px;background:rgba(255,255,255,.05)}
+
+/* TEXTAREA */
+textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-family:'Noto Sans TC',sans-serif;font-size:.76rem;line-height:1.75;padding:.8rem;resize:vertical;min-height:78px;transition:border-color .2s}
+textarea:focus{outline:none;border-color:var(--g1)}
+textarea::placeholder{color:rgba(168,144,112,.5)}
+
+/* STYLE SELECTOR */
+.style-grid{display:grid;grid-template-columns:1fr 1fr;gap:.6rem}
+.style-card{border:1.5px solid rgba(196,153,42,.2);border-radius:10px;padding:.7rem .8rem;cursor:pointer;transition:.2s;position:relative;overflow:hidden}
+.style-card:hover{border-color:rgba(196,153,42,.5);background:rgba(196,153,42,.06)}
+.style-card.selected{border-color:var(--g2);background:rgba(196,153,42,.12)}
+.style-card.selected::after{content:'✓';position:absolute;top:.4rem;right:.6rem;font-size:.7rem;color:var(--g2)}
+.swatch{height:32px;border-radius:6px;margin-bottom:.5rem}
+.style-name{font-size:.72rem;font-weight:500;color:#FAF8F2;margin-bottom:.15rem}
+.style-desc{font-size:.6rem;color:var(--light);line-height:1.4}
+
+/* VARIATION TOGGLES */
+.toggle-row{display:flex;flex-wrap:wrap;gap:.5rem}
+.tog{border:1px solid rgba(196,153,42,.22);border-radius:20px;padding:.25rem .7rem;font-size:.65rem;color:var(--light);cursor:pointer;transition:.2s}
+.tog:hover{border-color:rgba(196,153,42,.45);color:var(--g3)}
+.tog.on{border-color:var(--g2);background:rgba(196,153,42,.14);color:var(--g3)}
+
+/* GENERATE BTN */
+.btn{width:100%;background:linear-gradient(135deg,#B8882A,#D4AF50,#C4992A);border:none;border-radius:10px;color:#1C1408;font-family:'Noto Serif TC',serif;font-size:.88rem;font-weight:700;letter-spacing:.15em;padding:.95rem;cursor:pointer;transition:.3s}
+.btn:hover{transform:translateY(-2px);box-shadow:0 8px 28px rgba(196,153,42,.4)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.spin{display:none;width:16px;height:16px;border:2px solid rgba(28,20,8,.3);border-top-color:#1C1408;border-radius:50%;animation:sp .7s linear infinite;margin:0 auto}
+@keyframes sp{to{transform:rotate(360deg)}}
+
+/* PROGRESS */
+.pw{display:none;margin-bottom:1.6rem}
+.psteps{display:flex;gap:.4rem;margin-bottom:.5rem}
+.pstep{flex:1;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.pstep .f{height:100%;width:0;background:linear-gradient(90deg,var(--g1),var(--g3));transition:width .5s}
+.plbl{font-size:.7rem;color:var(--light)}
+
+/* ANALYSIS */
+.ana{display:none;margin-bottom:1.6rem;padding:1.1rem 1.3rem;background:rgba(196,153,42,.05);border:1px solid rgba(196,153,42,.18);border-radius:12px}
+.ana-t{font-size:.58rem;letter-spacing:.2em;color:var(--g2);text-transform:uppercase;margin-bottom:.7rem}
+.chip-row{display:flex;flex-wrap:wrap;gap:.3rem;margin-bottom:.5rem}
+.chip{background:rgba(196,153,42,.12);border:1px solid rgba(196,153,42,.25);border-radius:20px;padding:.2rem .6rem;font-size:.63rem;color:var(--g3)}
+.clbl{font-size:.6rem;color:var(--light);margin-bottom:.25rem}
+
+/* RESULTS */
+.rg{display:grid;grid-template-columns:repeat(2,1fr);gap:1.3rem}
+.ic{border:1px solid rgba(196,153,42,.2);border-radius:14px;overflow:hidden;transition:transform .2s}
+.ic:hover{transform:translateY(-2px)}
+.ch{padding:.65rem .95rem;border-bottom:1px solid rgba(196,153,42,.1);display:flex;align-items:center;justify-content:space-between}
+.cnum{font-family:'Cormorant Garamond',serif;font-size:1.3rem;color:var(--g2);font-style:italic}
+.cttl{font-size:.65rem;color:var(--light);margin-top:.05rem}
+.dlb{background:none;border:1px solid rgba(196,153,42,.28);border-radius:6px;color:var(--g2);font-size:.64rem;padding:.26rem .6rem;cursor:pointer;transition:.2s}
+.dlb:hover{background:rgba(196,153,42,.1)}
+.cw{width:100%;aspect-ratio:1;overflow:hidden;background:#f5f0e8}
+.cw canvas{width:100%;height:100%;display:block}
+.cap{padding:.55rem .95rem;font-size:.65rem;color:rgba(168,144,112,.7);line-height:1.5}
+
+/* EMPTY */
+.emp{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;gap:1rem}
+.emp-txt{font-size:.8rem;color:rgba(168,144,112,.55);text-align:center;line-height:2;letter-spacing:.05em}
+
+@media(max-width:860px){
+  .layout{grid-template-columns:1fr}
+  .lp{border-right:none;border-bottom:1px solid rgba(196,153,42,.15)}
+  .rg{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<header class="hd">
+  <div class="hd-brand">依洛嘉國際</div>
+  <div class="hd-sub">Product Showcase · Marketing System v3</div>
+  <div class="hd-cr">© 依洛嘉國際行銷使用 · 盜用必究</div>
+</header>
+
+<div class="layout">
+<div class="lp">
+
+  <!-- STEP 1 -->
+  <div class="sec">
+    <div class="sec-lbl">01 · 產品照片</div>
+    <div class="upz" id="pz">
+      <input type="file" accept="image/*" onchange="onPhoto(event)">
+      <svg class="upz-ico" viewBox="0 0 34 34" fill="none"><rect x="2" y="7" width="30" height="22" rx="4" stroke="#C4992A" stroke-width="1.3"/><circle cx="22" cy="16" r="4" stroke="#C4992A" stroke-width="1.3"/><path d="M2 25L9 18L15 24L21 19L32 27" stroke="#C4992A" stroke-width="1.2" stroke-linecap="round"/></svg>
+      <div class="upz-txt" id="pzt">點擊上傳產品主圖</div>
+    </div>
+    <img class="prev" id="pp">
+  </div>
+
+  <!-- STEP 2 -->
+  <div class="sec">
+    <div class="sec-lbl">02 · 標籤 / 成分</div>
+    <div class="upz" style="margin-bottom:.7rem" id="lz">
+      <input type="file" accept="image/*" onchange="onLabel(event)">
+      <svg class="upz-ico" viewBox="0 0 34 34" fill="none"><rect x="5" y="2" width="24" height="30" rx="3" stroke="#C4992A" stroke-width="1.3"/><path d="M10 12H24M10 17H24M10 22H17" stroke="#C4992A" stroke-width="1.1" stroke-linecap="round"/></svg>
+      <div class="upz-txt">上傳標籤圖（選填）</div>
+    </div>
+    <img class="prev" id="lp2">
+    <textarea id="ltxt" placeholder="或輸入：產品名稱、主要成分、功效說明…&#10;&#10;例：玫瑰保濕精華，含玫瑰萃取、玻尿酸…"></textarea>
+  </div>
+
+  <!-- STEP 3: STYLE -->
+  <div class="sec">
+    <div class="sec-lbl">03 · 選擇風格主題</div>
+    <div class="style-grid" id="styleGrid">
+
+      <div class="style-card selected" data-style="marble" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#FAF8F4,#EDE3D4);border:1px solid rgba(196,153,42,.3)"></div>
+        <div class="style-name">🏛 大理石奢金</div>
+        <div class="style-desc">米白石紋·暖金點綴<br>高端電商首選</div>
+      </div>
+
+      <div class="style-card" data-style="ink" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#0E1A1F,#1A2F38);border:1px solid rgba(80,160,180,.3)"></div>
+        <div class="style-name">🖋 東方水墨</div>
+        <div class="style-desc">深墨藍底·金箔潑墨<br>高雅文人風</div>
+      </div>
+
+      <div class="style-card" data-style="rose" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#FDF0F0,#F5D8D8,#EEBDBD);border:1px solid rgba(196,120,120,.3)"></div>
+        <div class="style-name">🌹 玫瑰輕奢</div>
+        <div class="style-desc">粉霧玫瑰·柔金線條<br>女性美妝最愛</div>
+      </div>
+
+      <div class="style-card" data-style="botanical" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#F2F8F0,#DFF0D8,#C8E6BC);border:1px solid rgba(80,150,80,.3)"></div>
+        <div class="style-name">🌿 植萃自然</div>
+        <div class="style-desc">淡綠草本·清新葉脈<br>天然成分主打</div>
+      </div>
+
+      <div class="style-card" data-style="noir" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#111111,#222222);border:1px solid rgba(196,153,42,.4)"></div>
+        <div class="style-name">⬛ 黑金極奢</div>
+        <div class="style-desc">純黑底·炫金幾何<br>頂級品牌質感</div>
+      </div>
+
+      <div class="style-card" data-style="mist" onclick="pickStyle(this)">
+        <div class="swatch" style="background:linear-gradient(135deg,#EEF2F8,#D8E4F5,#C8D8F0);border:1px solid rgba(100,130,200,.3)"></div>
+        <div class="style-name">☁️ 薄霧仙境</div>
+        <div class="style-desc">霧藍漸層·光暈粒子<br>輕盈夢幻感</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- STEP 4: VARIATIONS -->
+  <div class="sec">
+    <div class="sec-lbl">04 · 細節選項</div>
+    <div class="toggle-row">
+      <div class="tog on" data-key="icons" onclick="togOpt(this)">✦ 成分圖示</div>
+      <div class="tog on" data-key="radial" onclick="togOpt(this)">⊙ 放射連線</div>
+      <div class="tog on" data-key="deco" onclick="togOpt(this)">❋ 植物裝飾</div>
+      <div class="tog on" data-key="particles" onclick="togOpt(this)">· 粒子散點</div>
+      <div class="tog on" data-key="tagline" onclick="togOpt(this)">✍ 標語文字</div>
+      <div class="tog" data-key="specbar" onclick="togOpt(this)">📋 規格欄</div>
+      <div class="tog" data-key="darkprod" onclick="togOpt(this)">🌑 深色第三張</div>
+    </div>
+  </div>
+
+  <!-- TARGET -->
+  <div class="sec">
+    <div class="sec-lbl">05 · 目標族群（選填）</div>
+    <textarea id="ttxt" style="min-height:55px" placeholder="例：30-45歲熟齡女性，抗老保濕…"></textarea>
+  </div>
+
+  <button class="btn" id="genBtn" onclick="doGen()">
+    <span id="btnTxt">✦ 生成四張展示圖</span>
+    <div class="spin" id="sp"></div>
+  </button>
+
+</div>
+
+<!-- RIGHT PANEL -->
+<div class="rp" id="rp">
+  <div class="pw" id="pw">
+    <div class="psteps"><div class="pstep"><div class="f" id="f1"></div></div><div class="pstep"><div class="f" id="f2"></div></div><div class="pstep"><div class="f" id="f3"></div></div><div class="pstep"><div class="f" id="f4"></div></div></div>
+    <div class="plbl" id="plbl">分析中…</div>
+  </div>
+  <div class="ana" id="ana">
+    <div class="ana-t">✦ AI 分析</div>
+    <div class="clbl">賣點</div><div class="chip-row" id="sc"></div>
+    <div class="clbl">核心成分</div><div class="chip-row" id="ic"></div>
+  </div>
+  <div class="rg" id="rg" style="display:none"></div>
+  <div class="emp" id="emp">
+    <svg width="60" height="60" viewBox="0 0 60 60" fill="none" style="opacity:.15"><rect x="6" y="6" width="48" height="48" rx="8" stroke="#C4992A" stroke-width="1.4"/><circle cx="24" cy="26" r="6" stroke="#C4992A" stroke-width="1.4"/><path d="M6 42L18 30L26 38L36 28L54 44" stroke="#C4992A" stroke-width="1.4" stroke-linecap="round"/></svg>
+    <div class="emp-txt">上傳產品照片，選擇風格主題<br>AI 自動生成四張精緻展示圖</div>
+  </div>
+</div>
+</div>
+
+<script>
+// ─── STATE ───
+let prodImg=null, labelImg=null, aiData=null;
+let curStyle='marble';
+let opts={icons:true,radial:true,deco:true,particles:true,tagline:true,specbar:false,darkprod:false};
+
+function pickStyle(el){
+  document.querySelectorAll('.style-card').forEach(c=>c.classList.remove('selected'));
+  el.classList.add('selected');
+  curStyle=el.dataset.style;
+}
+function togOpt(el){
+  el.classList.toggle('on');
+  opts[el.dataset.key]=el.classList.contains('on');
+}
+function onPhoto(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{
+    prodImg=ev.target.result;
+    const p=document.getElementById('pp');
+    p.src=prodImg;p.style.display='block';
+    document.getElementById('pzt').textContent='已上傳 ✓';
+  };r.readAsDataURL(f);
+}
+function onLabel(e){
+  const f=e.target.files[0];if(!f)return;
+  const r=new FileReader();
+  r.onload=ev=>{labelImg=ev.target.result;const p=document.getElementById('lp2');p.src=labelImg;p.style.display='block';};
+  r.readAsDataURL(f);
+}
+
+const wait=ms=>new Promise(r=>setTimeout(r,ms));
+function prog(step,pct,lbl){
+  for(let i=1;i<=4;i++){
+    const el=document.getElementById('f'+i);
+    if(i<step)el.style.width='100%';
+    else if(i===step)el.style.width=pct+'%';
+    else el.style.width='0%';
+  }
+  document.getElementById('plbl').textContent=lbl;
+}
+
+async function doGen(){
+  if(!prodImg){alert('請先上傳產品照片');return;}
+  const ltxt=document.getElementById('ltxt').value.trim();
+  const ttxt=document.getElementById('ttxt').value.trim();
+  if(!ltxt&&!labelImg){alert('請上傳標籤或輸入成分說明');return;}
+
+  const btn=document.getElementById('genBtn');
+  btn.disabled=true;
+  document.getElementById('btnTxt').style.display='none';
+  document.getElementById('sp').style.display='block';
+  document.getElementById('emp').style.display='none';
+  document.getElementById('pw').style.display='block';
+  document.getElementById('rg').style.display='none';
+  document.getElementById('ana').style.display='none';
+
+  try{
+    prog(1,40,'Step 1 · AI 解析成分與賣點…');
+    aiData=await analyze(ltxt,ttxt,labelImg);
+    prog(1,100,'✓ 分析完成');
+    showAna(aiData);
+    await wait(80);
+
+    prog(2,20,'Step 2 · 白底主圖…');
+    const c1=await drawImg1(prodImg,aiData,curStyle,opts);
+    prog(2,100,'✓');await wait(60);
+
+    prog(3,20,'Step 3 · 成分圍繞圖…');
+    const c2=await drawImg2(prodImg,aiData,curStyle,opts);
+    prog(3,100,'✓');await wait(60);
+
+    prog(4,20,'Step 4 · 成分深析 + 期待圖…');
+    const c3=await drawImg3(prodImg,aiData,curStyle,opts);
+    const c4=await drawImg4(prodImg,aiData,curStyle,opts);
+    prog(4,100,'✦ 全部完成！');
+
+    showResults([
+      {num:'01',title:'白底主圖',c:c1,cap:'電商首圖，乾淨呈現產品'},
+      {num:'02',title:'成分圍繞圖',c:c2,cap:'成分放射排列，突顯配方賣點'},
+      {num:'03',title:'成分深度解析',c:c3,cap:'專業感圖文，建立品牌信任'},
+      {num:'04',title:'消費者期待圖',c:c4,cap:'情境氛圍，引發購買想像'},
+    ]);
+  }catch(err){
+    console.error(err);alert('生成失敗：'+err.message);
+  }
+  btn.disabled=false;
+  document.getElementById('btnTxt').style.display='block';
+  document.getElementById('sp').style.display='none';
+}
+
+// ─── AI ANALYSIS ───
+async function analyze(ltxt,ttxt,limg){
+  const uc=[];
+  if(limg){const b64=limg.split(',')[1],mime=limg.split(';')[0].split(':')[1];uc.push({type:'image',source:{type:'base64',media_type:mime,data:b64}});}
+  uc.push({type:'text',text:`你是頂級化妝品行銷顧問。純JSON回應，無markdown：
+產品說明：${ltxt||'見圖'}
+目標：${ttxt||'一般女性'}
+
+{
+  "productName":"名稱",
+  "category":"品類",
+  "tagline":"標語12字內",
+  "sellingPoints":["賣點1","賣點2","賣點3"],
+  "ingredients":[{"name":"成分","benefit":"功效8字內","symbolChar":"單一unicode符號或漢字，如◈✿⬡◉❋◆▲●◇"}],
+  "dreamScene":"使用後美好場景20字內",
+  "skinType":"適合膚質",
+  "usage":"使用方式15字內",
+  "spec":"規格說明，如30ml/50g/30入"
+}`});
+  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:uc}]})});
+  const d=await resp.json();
+  const txt=d.content.map(b=>b.text||'').join('');
+  return JSON.parse(txt.replace(/```json|```/g,'').trim());
+}
+function showAna(a){
+  document.getElementById('sc').innerHTML=(a.sellingPoints||[]).map(s=>`<span class="chip">✦ ${s}</span>`).join('');
+  document.getElementById('ic').innerHTML=(a.ingredients||[]).map(i=>`<span class="chip">${i.symbolChar||'◈'} ${i.name}</span>`).join('');
+  document.getElementById('ana').style.display='block';
+}
+function showResults(items){
+  const g=document.getElementById('rg');g.innerHTML='';
+  items.forEach(it=>{
+    const card=document.createElement('div');card.className='ic';
+    card.innerHTML=`<div class="ch"><div><div class="cnum">${it.num}</div><div class="cttl">${it.title}</div></div><button class="dlb" onclick="dl(this,'依洛嘉_${it.title}')">下載 PNG</button></div><div class="cw" id="cw${it.num}"></div><div class="cap">${it.cap}</div>`;
+    g.appendChild(card);
+    document.getElementById('cw'+it.num).appendChild(it.c);
+  });
+  g.style.display='grid';
+}
+function dl(btn,name){
+  const c=btn.closest('.ic').querySelector('canvas');
+  const a=document.createElement('a');a.download=name+'.png';a.href=c.toDataURL('image/png');a.click();
+}
+
+// ─── THEME DEFINITIONS ───
+const THEMES={
+  marble:{
+    bg:(ctx,S)=>{
+      // warm marble
+      const g=ctx.createLinearGradient(0,0,S,S);
+      g.addColorStop(0,'#FAF8F4');g.addColorStop(.5,'#F2EBE0');g.addColorStop(1,'#EDE3D4');
+      ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+      // veins
+      ctx.save();
+      [['rgba(185,165,125,0.14)',1.8,4],['rgba(165,145,105,0.09)',1.1,6],['rgba(205,185,145,0.07)',.6,8]].forEach(([col,lw,n])=>{
+        ctx.strokeStyle=col;ctx.lineWidth=lw;
+        for(let j=0;j<n;j++){
+          ctx.beginPath();
+          const sx=Math.random()*S*1.4-S*.2,sy=Math.random()*S*1.4-S*.2;
+          ctx.moveTo(sx,sy);
+          ctx.bezierCurveTo(sx+(-150+Math.random()*300),sy+(-80+Math.random()*500),sx+(-100+Math.random()*200)+100,sy+(100+Math.random()*400),sx+(-100+Math.random()*200)+200,sy+(200+Math.random()*500));
+          ctx.stroke();
+        }
+      });
+      ctx.restore();
+    },
+    accent:'#C4992A',accent2:'#D4AF50',textDark:'#2A2015',textMid:'#6B5B3E',textLight:'rgba(107,91,62,.65)',
+    cardBg:'rgba(255,255,255,0.72)',cardStroke:'rgba(196,153,42,0.3)',
+    brandColor:'rgba(196,153,42,.85)',borderColor:'rgba(196,153,42,0.25)',
+    titleStyle:'dark'
+  },
+  ink:{
+    bg:(ctx,S)=>{
+      const g=ctx.createLinearGradient(0,0,S,S);
+      g.addColorStop(0,'#0D1A22');g.addColorStop(.6,'#0F2030');g.addColorStop(1,'#152535');
+      ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+      // ink splash
+      ctx.save();
+      ctx.globalAlpha=.06;
+      for(let i=0;i<6;i++){
+        const bx=Math.random()*S,by=Math.random()*S;
+        const gr=ctx.createRadialGradient(bx,by,0,bx,by,80+Math.random()*180);
+        gr.addColorStop(0,'rgba(196,220,230,0.6)');gr.addColorStop(1,'transparent');
+        ctx.fillStyle=gr;ctx.fillRect(0,0,S,S);
+      }
+      ctx.restore();
+      // gold calligraphy strokes
+      ctx.save();
+      ctx.strokeStyle='rgba(196,153,42,0.12)';ctx.lineWidth=2.5;
+      for(let i=0;i<5;i++){
+        ctx.beginPath();
+        const sx=Math.random()*S,sy=Math.random()*S;
+        ctx.moveTo(sx,sy);
+        ctx.quadraticCurveTo(sx+(-200+Math.random()*400),sy+(-200+Math.random()*400),sx+(-100+Math.random()*200)+300,sy+(-100+Math.random()*200)+300);
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+    accent:'#C4992A',accent2:'#8ABFCF',textDark:'#F0F8FF',textMid:'rgba(220,235,245,.75)',textLight:'rgba(160,200,220,.6)',
+    cardBg:'rgba(8,28,40,0.75)',cardStroke:'rgba(196,153,42,0.35)',
+    brandColor:'rgba(196,153,42,.85)',borderColor:'rgba(196,153,42,0.3)',
+    titleStyle:'light'
+  },
+  rose:{
+    bg:(ctx,S)=>{
+      const g=ctx.createLinearGradient(0,0,S,S);
+      g.addColorStop(0,'#FDF1F1');g.addColorStop(.5,'#F8E0DC');g.addColorStop(1,'#F0CECA');
+      ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+      // rose petal circles
+      ctx.save();
+      ctx.globalAlpha=.055;
+      for(let i=0;i<8;i++){
+        const cx=Math.random()*S,cy=Math.random()*S,r=40+Math.random()*120;
+        ctx.strokeStyle='rgba(196,100,100,0.6)';ctx.lineWidth=1;
+        ctx.beginPath();ctx.arc(cx,cy,r,0,Math.PI*2);ctx.stroke();
+      }
+      ctx.restore();
+    },
+    accent:'#C47878',accent2:'#D4A8A8',textDark:'#3A1818',textMid:'#7A4848',textLight:'rgba(122,72,72,.6)',
+    cardBg:'rgba(255,255,255,0.75)',cardStroke:'rgba(196,120,120,0.3)',
+    brandColor:'rgba(184,88,88,.85)',borderColor:'rgba(196,120,120,0.25)',
+    titleStyle:'dark'
+  },
+  botanical:{
+    bg:(ctx,S)=>{
+      const g=ctx.createLinearGradient(0,S,S,0);
+      g.addColorStop(0,'#EFF8EC');g.addColorStop(.5,'#E2F5DB');g.addColorStop(1,'#F4FAF2');
+      ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+      // leaf veins
+      ctx.save();
+      ctx.strokeStyle='rgba(80,140,80,0.1)';ctx.lineWidth=1;
+      for(let i=0;i<12;i++){
+        ctx.beginPath();
+        const sx=Math.random()*S,sy=Math.random()*S;
+        ctx.moveTo(sx,sy);
+        ctx.lineTo(sx+(-80+Math.random()*160),sy+(-80+Math.random()*160));
+        ctx.stroke();
+      }
+      ctx.restore();
+    },
+    accent:'#5A9060',accent2:'#7AB880',textDark:'#1A3020',textMid:'#3A6040',textLight:'rgba(58,96,64,.6)',
+    cardBg:'rgba(240,255,240,0.72)',cardStroke:'rgba(80,150,80,0.3)',
+    brandColor:'rgba(80,140,80,.85)',borderColor:'rgba(80,140,80,0.22)',
+    titleStyle:'dark'
+  },
+  noir:{
+    bg:(ctx,S)=>{
+      ctx.fillStyle='#0A0A0A';ctx.fillRect(0,0,S,S);
+      // geometric grid
+      ctx.save();
+      ctx.strokeStyle='rgba(196,153,42,0.06)';ctx.lineWidth=.8;
+      const step=60;
+      for(let x=0;x<S;x+=step){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,S);ctx.stroke();}
+      for(let y=0;y<S;y+=step){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(S,y);ctx.stroke();}
+      ctx.restore();
+      // diagonal gold lines
+      ctx.save();
+      ctx.strokeStyle='rgba(196,153,42,0.1)';ctx.lineWidth=1.5;
+      for(let i=0;i<6;i++){
+        ctx.beginPath();
+        ctx.moveTo(i*200-100,0);ctx.lineTo(i*200+S*.5,S);ctx.stroke();
+      }
+      ctx.restore();
+    },
+    accent:'#C4992A',accent2:'#E8C97A',textDark:'#FAF0D0',textMid:'rgba(232,200,120,.8)',textLight:'rgba(196,153,42,.55)',
+    cardBg:'rgba(20,15,5,0.82)',cardStroke:'rgba(196,153,42,0.4)',
+    brandColor:'rgba(232,200,120,.9)',borderColor:'rgba(196,153,42,0.35)',
+    titleStyle:'light'
+  },
+  mist:{
+    bg:(ctx,S)=>{
+      const g=ctx.createLinearGradient(0,0,S,S);
+      g.addColorStop(0,'#EEF3FA');g.addColorStop(.5,'#DCE8F5');g.addColorStop(1,'#CDDAF0');
+      ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+      // mist layers
+      ctx.save();
+      for(let i=0;i<5;i++){
+        const gx=Math.random()*S,gy=Math.random()*S;
+        const gr=ctx.createRadialGradient(gx,gy,0,gx,gy,200+Math.random()*250);
+        gr.addColorStop(0,'rgba(255,255,255,0.35)');gr.addColorStop(1,'transparent');
+        ctx.fillStyle=gr;ctx.fillRect(0,0,S,S);
+      }
+      ctx.restore();
+    },
+    accent:'#5588CC',accent2:'#88AADD',textDark:'#1A2A48',textMid:'#3A5080',textLight:'rgba(58,80,128,.6)',
+    cardBg:'rgba(255,255,255,0.68)',cardStroke:'rgba(80,130,200,0.28)',
+    brandColor:'rgba(80,120,200,.85)',borderColor:'rgba(80,130,200,0.22)',
+    titleStyle:'dark'
+  }
+};
+
+// ─── SHARED CANVAS HELPERS ───
+const SZ=1000;
+function mk(){const c=document.createElement('canvas');c.width=SZ;c.height=SZ;return c;}
+function loadImg(src){return new Promise((res,rej)=>{const i=new Image();i.onload=()=>res(i);i.onerror=rej;i.src=src;});}
+function fitProd(ctx,img,cx,cy,mW,mH){
+  const ar=img.width/img.height;
+  let w=mW,h=mH;
+  if(ar>1)h=w/ar;else w=h*ar;
+  ctx.drawImage(img,cx-w/2,cy-h/2,w,h);
+  return{w,h};
+}
+function rr(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+function ornLine(ctx,x1,y1,x2,y2,col,diamond=true){
+  ctx.save();ctx.strokeStyle=col;ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x2,y2);ctx.stroke();
+  if(diamond)[x1,x2].forEach((x,i)=>{
+    const y=i===0?y1:y2;
+    ctx.fillStyle=col;ctx.save();ctx.translate(x,y);ctx.rotate(Math.PI/4);
+    ctx.fillRect(-3,-3,6,6);ctx.restore();
+  });
+  ctx.restore();
+}
+function drawBrand(ctx,th){
+  ctx.save();
+  ctx.font=`300 ${Math.round(SZ*.021)}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.brandColor;ctx.textAlign='right';
+  ctx.fillText('依洛嘉國際',SZ*.96,SZ*.054);
+  ctx.restore();
+}
+function drawBorder(ctx,col,inner=true){
+  ctx.save();
+  ctx.strokeStyle=col;ctx.lineWidth=1.4;
+  ctx.strokeRect(SZ*.024,SZ*.024,SZ*.952,SZ*.952);
+  if(inner){ctx.lineWidth=.5;ctx.strokeRect(SZ*.031,SZ*.031,SZ*.938,SZ*.938);}
+  ctx.restore();
+}
+function drawParticles(ctx,col,n=22){
+  ctx.save();ctx.fillStyle=col;
+  for(let i=0;i<n;i++){
+    ctx.beginPath();ctx.arc(Math.random()*SZ,Math.random()*SZ,.8+Math.random()*2.5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+// Stylized leaf/botanical deco
+function drawLeaf(ctx,x,y,angle,size,col){
+  ctx.save();ctx.translate(x,y);ctx.rotate(angle);
+  ctx.fillStyle=col;ctx.globalAlpha=.22;
+  ctx.beginPath();ctx.ellipse(0,-size/2,size*.18,size/2,0,0,Math.PI*2);ctx.fill();
+  ctx.globalAlpha=.12;ctx.strokeStyle=col;ctx.lineWidth=.6;
+  ctx.beginPath();ctx.moveTo(0,0);ctx.lineTo(0,-size*.9);ctx.stroke();
+  ctx.restore();
+}
+function drawDecoLeaves(ctx,th,n=8){
+  if(!opts.deco)return;
+  const col=th.accent;
+  const pos=[[50,100],[950,80],[60,920],[960,940],[80,500],[940,500],[500,60],[500,950]];
+  for(let i=0;i<Math.min(n,pos.length);i++){
+    drawLeaf(ctx,pos[i][0],pos[i][1],Math.random()*Math.PI*2,35+Math.random()*25,col);
+  }
+}
+// Ingredient bubble
+function drawBubble(ctx,x,y,r,fillCol,strokeCol){
+  ctx.save();
+  ctx.fillStyle=fillCol;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.fill();
+  ctx.strokeStyle=strokeCol;ctx.lineWidth=1.2;ctx.beginPath();ctx.arc(x,y,r,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+}
+
+// ─── IMAGE 1: Clean product shot ───
+async function drawImg1(src,a,style,opts){
+  const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
+  const img=await loadImg(src);
+  th.bg(ctx,SZ);
+  if(opts.particles)drawParticles(ctx,th.accent+'22');
+  drawDecoLeaves(ctx,th);
+
+  // Subtle center glow
+  const grd=ctx.createRadialGradient(SZ/2,SZ*.45,40,SZ/2,SZ*.45,360);
+  grd.addColorStop(0,th.titleStyle==='light'?'rgba(255,255,255,0.07)':'rgba(255,255,255,0.35)');
+  grd.addColorStop(1,'rgba(255,255,255,0)');
+  ctx.fillStyle=grd;ctx.fillRect(0,0,SZ,SZ);
+
+  fitProd(ctx,img,SZ/2,SZ*.46,700,700);
+
+  // Bottom text card
+  ctx.save();
+  ctx.fillStyle=th.cardBg;
+  rr(ctx,SZ*.1,SZ*.79,SZ*.8,SZ*.165,14);ctx.fill();
+  ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.8;
+  rr(ctx,SZ*.1,SZ*.79,SZ*.8,SZ*.165,14);ctx.stroke();
+  ctx.restore();
+
+  ornLine(ctx,SZ*.2,SZ*.826,SZ*.8,SZ*.826,th.accent+'55');
+
+  ctx.save();ctx.textAlign='center';
+  ctx.font=`600 ${38}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.textDark;ctx.fillText(a.productName||'產品名稱',SZ/2,SZ*.86);
+  if(opts.tagline){
+    ctx.font=`300 ${19}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=th.accent;ctx.fillText(a.tagline||'',SZ/2,SZ*.898);
+  }
+  ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=th.textLight;ctx.fillText((a.skinType||'')+(a.usage?' · '+a.usage:''),SZ/2,SZ*.927);
+  ctx.restore();
+
+  drawBrand(ctx,th);
+  drawBorder(ctx,th.borderColor);
+  return c;
+}
+
+// ─── IMAGE 2: Ingredient radial map ───
+async function drawImg2(src,a,style,opts){
+  const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
+  const img=await loadImg(src);
+  const ings=(a.ingredients||[]).slice(0,6);
+  th.bg(ctx,SZ);
+  if(opts.particles)drawParticles(ctx,th.accent+'1A');
+  drawDecoLeaves(ctx,th,6);
+
+  // Title
+  ctx.save();ctx.textAlign='center';
+  ctx.font=`700 ${27}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.textDark;
+  ctx.fillText('【'+a.productName+'】成分解析',SZ/2,SZ*.072);
+  if(opts.tagline){
+    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=th.accent;ctx.fillText(a.tagline||'奢華配方',SZ/2,SZ*.104);
+  }
+  ctx.restore();
+  ornLine(ctx,SZ*.16,SZ*.12,SZ*.84,SZ*.12,th.accent+'55');
+
+  // Product center
+  fitProd(ctx,img,SZ/2,SZ*.52,380,380);
+
+  // Positions for up to 6 ingredients
+  const poss=[
+    {x:SZ*.17,y:SZ*.26,align:'right'},
+    {x:SZ*.83,y:SZ*.26,align:'left'},
+    {x:SZ*.14,y:SZ*.52,align:'right'},
+    {x:SZ*.86,y:SZ*.52,align:'left'},
+    {x:SZ*.17,y:SZ*.78,align:'right'},
+    {x:SZ*.83,y:SZ*.78,align:'left'},
+  ];
+
+  ings.forEach((ing,i)=>{
+    if(i>=poss.length)return;
+    const pos=poss[i];
+    const isR=pos.align==='right';
+    const bx=isR?pos.x+SZ*.045:pos.x-SZ*.045;
+
+    // Radial line to center
+    if(opts.radial){
+      ctx.save();
+      ctx.strokeStyle=th.accent+'3A';ctx.lineWidth=.9;ctx.setLineDash([4,6]);
+      ctx.beginPath();
+      ctx.moveTo(isR?pos.x+SZ*.09:pos.x-SZ*.09,pos.y);
+      ctx.lineTo(SZ*(isR?.38:.62),SZ*.52);ctx.stroke();
+      ctx.restore();
+    }
+
+    // Bubble icon
+    if(opts.icons){
+      drawBubble(ctx,bx,pos.y,SZ*.05,th.accent+'22',th.accent+'66');
+      ctx.save();
+      ctx.font=`400 ${22}px serif`;
+      ctx.fillStyle=th.accent;ctx.textAlign='center';
+      ctx.fillText(ing.symbolChar||'◈',bx,pos.y+SZ*.008);
+      ctx.restore();
+    }
+
+    // Text
+    ctx.save();ctx.textAlign=pos.align;
+    ctx.font=`600 ${18}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=th.textDark;
+    ctx.fillText(ing.name,pos.x,pos.y-SZ*.012);
+    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=th.textMid;
+    ctx.fillText(ing.benefit||'',pos.x,pos.y+SZ*.014);
+    ctx.restore();
+  });
+
+  // Bottom spec bar
+  if(opts.specbar&&a.spec){
+    ctx.save();
+    ctx.fillStyle=th.cardBg;
+    rr(ctx,SZ*.12,SZ*.9,SZ*.76,SZ*.058,10);ctx.fill();
+    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.7;
+    rr(ctx,SZ*.12,SZ*.9,SZ*.76,SZ*.058,10);ctx.stroke();
+    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=th.textMid;ctx.textAlign='center';
+    ctx.fillText('規格：'+a.spec,SZ/2,SZ*.937);
+    ctx.restore();
+  }
+
+  drawBrand(ctx,th);
+  drawBorder(ctx,th.borderColor);
+  return c;
+}
+
+// ─── IMAGE 3: Deep dive / science ───
+async function drawImg3(src,a,style,opts){
+  const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
+  const img=await loadImg(src);
+  const ings=(a.ingredients||[]).slice(0,5);
+
+  // Dark override if toggle on
+  const useDark=opts.darkprod;
+  if(useDark){THEMES.noir.bg(ctx,SZ);}else{th.bg(ctx,SZ);}
+  const dth=useDark?THEMES.noir:th;
+
+  if(opts.particles)drawParticles(ctx,dth.accent+'1A');
+
+  // Ghost product left
+  ctx.save();ctx.globalAlpha=.12;fitProd(ctx,img,SZ*.28,SZ*.5,520,520);ctx.restore();
+  ctx.save();ctx.globalAlpha=.88;fitProd(ctx,img,SZ*.28,SZ*.5,370,370);ctx.restore();
+
+  // Right panel header
+  ctx.save();ctx.textAlign='left';
+  ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=dth.accent;ctx.fillText('成分深度解析',SZ*.55,SZ*.11);
+  ctx.font=`500 ${32}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=dth.textDark;ctx.fillText(a.productName||'',SZ*.55,SZ*.155);
+  if(opts.tagline){
+    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=dth.accent2;ctx.fillText(a.tagline||'',SZ*.55,SZ*.19);
+  }
+  ctx.restore();
+  ornLine(ctx,SZ*.55,SZ*.208,SZ*.96,SZ*.208,dth.accent+'55');
+
+  ings.forEach((ing,i)=>{
+    const y=SZ*.245+i*SZ*.138,x=SZ*.55,cW=SZ*.39,cH=SZ*.115;
+    ctx.save();
+    ctx.fillStyle=dth.cardBg;rr(ctx,x,y,cW,cH,10);ctx.fill();
+    ctx.strokeStyle=dth.cardStroke;ctx.lineWidth=.8;rr(ctx,x,y,cW,cH,10);ctx.stroke();
+    // Gold bar
+    ctx.fillStyle=dth.accent+'CC';rr(ctx,x,y,4,cH,3);ctx.fill();
+    // Icon
+    if(opts.icons){
+      drawBubble(ctx,x+SZ*.038,y+cH/2,SZ*.033,dth.accent+'18',dth.accent+'44');
+      ctx.font=`400 ${18}px serif`;ctx.fillStyle=dth.accent;ctx.textAlign='center';
+      ctx.fillText(ing.symbolChar||'◈',x+SZ*.038,y+cH*.55);
+    }
+    ctx.textAlign='left';
+    ctx.font=`500 ${18}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=dth.textDark;ctx.fillText(ing.name,x+SZ*.085,y+cH*.44);
+    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=dth.accent;ctx.fillText(ing.benefit||'',x+SZ*.085,y+cH*.72);
+    ctx.restore();
+  });
+
+  ctx.save();ctx.textAlign='center';
+  ctx.font=`300 ${15}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=dth.accent+'77';ctx.fillText('依洛嘉國際 · 品質保證',SZ/2,SZ*.955);
+  ctx.restore();
+  drawBrand(ctx,dth);
+  drawBorder(ctx,dth.borderColor);
+  return c;
+}
+
+// ─── IMAGE 4: Dream/aspiration ───
+async function drawImg4(src,a,style,opts){
+  const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
+  const img=await loadImg(src);
+  th.bg(ctx,SZ);
+  if(opts.particles)drawParticles(ctx,th.accent+'18',35);
+
+  // Atmospheric overlay circles
+  ctx.save();ctx.globalAlpha=.07;
+  [[SZ*.72,SZ*.28,280],[SZ*.25,SZ*.75,220]].forEach(([cx,cy,r])=>{
+    const gr=ctx.createRadialGradient(cx,cy,0,cx,cy,r);
+    gr.addColorStop(0,th.accent);gr.addColorStop(1,'transparent');
+    ctx.fillStyle=gr;ctx.fillRect(0,0,SZ,SZ);
+  });
+  ctx.restore();
+  ctx.save();ctx.globalAlpha=.08;
+  ctx.strokeStyle=th.accent;ctx.lineWidth=1;
+  ctx.beginPath();ctx.arc(SZ*.7,SZ*.3,260,0,Math.PI*2);ctx.stroke();
+  ctx.beginPath();ctx.arc(SZ*.7,SZ*.3,300,0,Math.PI*2);ctx.stroke();
+  ctx.restore();
+
+  drawDecoLeaves(ctx,th,10);
+
+  // Top aspirational text
+  ctx.save();ctx.textAlign='center';
+  ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=th.accent+'BB';ctx.fillText('想象一下…',SZ/2,SZ*.1);
+
+  const scene=a.dreamScene||'肌膚如絲般柔滑，自信綻放妳的光采';
+  ctx.font=`400 ${34}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.textDark;
+  if(scene.length<=14){
+    ctx.fillText(scene,SZ/2,SZ*.165);
+  }else{
+    const m=Math.ceil(scene.length/2);
+    ctx.fillText(scene.slice(0,m),SZ/2,SZ*.152);
+    ctx.fillText(scene.slice(m),SZ/2,SZ*.196);
+  }
+  ctx.restore();
+  ornLine(ctx,SZ*.25,SZ*.225,SZ*.75,SZ*.225,th.accent+'55');
+
+  // Product
+  fitProd(ctx,img,SZ/2,SZ*.525,430,430);
+
+  // 3 benefit pills
+  const pills=[
+    {t:a.skinType||'全膚質',sym:th.accent},
+    {t:(a.sellingPoints||[])[0]||'深層保濕',sym:th.accent2},
+    {t:(a.sellingPoints||[])[1]||'長效修護',sym:th.accent},
+  ];
+  pills.forEach((p,i)=>{
+    const pw=SZ*.245,ph=SZ*.072,px=SZ*.085+i*(pw+SZ*.02),py=SZ*.855;
+    ctx.save();
+    ctx.fillStyle=th.cardBg;rr(ctx,px,py,pw,ph,ph/2);ctx.fill();
+    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.9;rr(ctx,px,py,pw,ph,ph/2);ctx.stroke();
+    ctx.textAlign='center';
+    ctx.font=`400 ${13}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=p.sym;ctx.fillText('◈',px+SZ*.03,py+ph*.6);
+    ctx.font=`400 ${12}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=th.textDark;
+    const short=p.t.length>9?p.t.slice(0,9)+'…':p.t;
+    ctx.fillText(short,px+pw*.55,py+ph*.6);
+    ctx.restore();
+  });
+
+  // Footer bar
+  ctx.save();
+  const fbc=th.titleStyle==='light'?'rgba(10,8,4,0.75)':'rgba(42,32,21,0.7)';
+  ctx.fillStyle=fbc;ctx.fillRect(0,SZ*.944,SZ,SZ*.056);
+  ctx.font=`300 ${15}px 'Noto Serif TC',serif`;
+  ctx.fillStyle=th.brandColor;ctx.textAlign='center';
+  ctx.fillText('依洛嘉國際 · '+(a.productName||'')+' · '+(a.category||''),SZ/2,SZ*.978);
+  ctx.restore();
+
+  drawBorder(ctx,th.borderColor);
+  return c;
+}
+</script>
+</body>
+</html>
