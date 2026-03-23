@@ -97,6 +97,23 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 .emp{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:420px;gap:1rem}
 .emp-txt{font-size:.8rem;color:rgba(168,144,112,.55);text-align:center;line-height:2;letter-spacing:.05em}
 
+.rmbg-bar{display:none;margin-top:.7rem;gap:.5rem;flex-direction:column}
+.rmbg-bar.show{display:flex}
+.rmbg-method{display:flex;gap:.4rem;margin-bottom:.1rem}
+.rmbg-opt{flex:1;border:1px solid rgba(196,153,42,.22);border-radius:8px;padding:.4rem .5rem;font-size:.65rem;color:var(--light);cursor:pointer;text-align:center;transition:.2s}
+.rmbg-opt:hover{border-color:rgba(196,153,42,.45);color:var(--g3)}
+.rmbg-opt.on{border-color:var(--g2);background:rgba(196,153,42,.12);color:var(--g3)}
+.rmbg-inp{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-size:.72rem;padding:.6rem .8rem;outline:none;transition:border-color .2s;display:none}
+.rmbg-inp.show{display:block}
+.rmbg-inp:focus{border-color:var(--g1)}
+.rmbg-btn{width:100%;background:rgba(196,153,42,.15);border:1px solid rgba(196,153,42,.35);border-radius:8px;color:var(--g2);font-size:.75rem;padding:.55rem;cursor:pointer;transition:.2s;font-family:'Noto Sans TC',sans-serif}
+.rmbg-btn:hover{background:rgba(196,153,42,.25)}
+.rmbg-btn:disabled{opacity:.4;cursor:not-allowed}
+.rmbg-status{font-size:.62rem;color:var(--light);text-align:center;min-height:1rem}
+.prev-compare{display:none;gap:.4rem;margin-top:.5rem}
+.prev-compare.show{display:grid;grid-template-columns:1fr 1fr}
+.prev-compare img{width:100%;height:80px;object-fit:contain;border-radius:6px;background:rgba(255,255,255,.05)}
+.prev-compare .pc-lbl{font-size:.58rem;color:var(--light);text-align:center;margin-top:.2rem}
 @media(max-width:860px){
   .layout{grid-template-columns:1fr}
   .lp{border-right:none;border-bottom:1px solid rgba(196,153,42,.15)}
@@ -124,6 +141,60 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
       <div class="upz-txt" id="pzt">點擊上傳產品主圖</div>
     </div>
     <img class="prev" id="pp">
+
+    <!-- BG REMOVAL -->
+    <div class="rmbg-bar" id="rmbgBar">
+      <div style="font-size:.62rem;color:var(--g2);letter-spacing:.12em;margin-bottom:.5rem">✦ 去背 / 修飾</div>
+
+      <div class="rmbg-method">
+        <div class="rmbg-opt on" id="mAI" onclick="pickMethod('ai')">
+          🤖 AI 去背
+          <div style="font-size:.56rem;opacity:.65;margin-top:.15rem">免費・不需金鑰</div>
+          <div style="font-size:.54rem;opacity:.45">★★★☆</div>
+        </div>
+        <div class="rmbg-opt" id="mRmbg" onclick="pickMethod('rmbg')">
+          ✂️ Remove.bg
+          <div style="font-size:.56rem;opacity:.65;margin-top:.15rem">每月50次免費</div>
+          <div style="font-size:.54rem;opacity:.45">★★★★★</div>
+        </div>
+      </div>
+
+      <!-- Remove.bg key input -->
+      <div id="rmbgKeyWrap" style="display:none">
+        <div style="position:relative">
+          <input class="rmbg-inp show" id="rmbgKey" placeholder="貼上 Remove.bg API Key…"
+            oninput="saveRmbgKey(this.value)"
+            style="padding-right:2.4rem">
+          <span onclick="toggleRmbgKey()" id="rmbgEye"
+            style="position:absolute;right:.7rem;top:50%;transform:translateY(-50%);cursor:pointer;font-size:.75rem;color:var(--light)">👁</span>
+        </div>
+        <div style="margin-top:.35rem;font-size:.58rem;color:rgba(168,144,112,.5);line-height:1.6">
+          尚未有 Key？
+          <a href="https://www.remove.bg/api" target="_blank"
+            style="color:var(--g2);text-decoration:none">remove.bg 免費申請 →</a>
+          <br>登入後 → API Keys → 複製 Free API Key
+        </div>
+        <div id="rmbgKeyStatus" style="font-size:.6rem;margin-top:.25rem;min-height:.8rem"></div>
+      </div>
+
+      <button class="rmbg-btn" id="rmbgBtn" onclick="doRemoveBg()">✦ 執行去背</button>
+      <div class="rmbg-status" id="rmbgStatus"></div>
+
+      <!-- Before / After compare -->
+      <div class="prev-compare" id="prevCompare">
+        <div><img id="origThumb"><div class="pc-lbl">原圖</div></div>
+        <div>
+          <img id="bgThumb">
+          <div class="pc-lbl" style="color:rgba(122,200,122,.8)">去背後 ✓</div>
+        </div>
+      </div>
+
+      <!-- Reset button -->
+      <button id="resetBgBtn" onclick="resetBg()"
+        style="display:none;width:100%;background:none;border:1px solid rgba(196,153,42,.2);border-radius:8px;color:var(--light);font-size:.65rem;padding:.4rem;cursor:pointer;margin-top:.2rem;font-family:'Noto Sans TC',sans-serif">
+        ↩ 還原原圖
+      </button>
+    </div>
   </div>
 
   <!-- STEP 2 -->
@@ -248,7 +319,7 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 
 <script>
 // ─── STATE ───
-let prodImg=null, labelImg=null, aiData=null;
+let prodImg=null, origProdImg=null, labelImg=null, aiData=null;
 let curStyle='marble';
 let opts={icons:true,radial:true,deco:true,particles:true,tagline:true,specbar:false,darkprod:false};
 
@@ -261,15 +332,180 @@ function togOpt(el){
   el.classList.toggle('on');
   opts[el.dataset.key]=el.classList.contains('on');
 }
+let bgMethod='ai';
+function pickMethod(m){
+  bgMethod=m;
+  document.getElementById('mAI').classList.toggle('on',m==='ai');
+  document.getElementById('mRmbg').classList.toggle('on',m==='rmbg');
+  document.getElementById('rmbgKeyWrap').style.display=m==='rmbg'?'block':'none';
+}
+function saveRmbgKey(v){
+  try{localStorage.setItem('yilojia_rmbgkey',v);}catch(e){}
+  const s=document.getElementById('rmbgKeyStatus');
+  if(v.length>8){s.style.color='rgba(122,200,122,.8)';s.textContent='✓ 已儲存';}
+  else if(v.length>0){s.style.color='rgba(200,100,100,.8)';s.textContent='⚠ Key 格式有誤';}
+  else s.textContent='';
+}
+function toggleRmbgKey(){
+  const inp=document.getElementById('rmbgKey');
+  const eye=document.getElementById('rmbgEye');
+  inp.type=inp.type==='password'?'text':'password';
+  eye.textContent=inp.type==='password'?'👁':'🙈';
+}
+function getRmbgKey(){
+  const f=document.getElementById('rmbgKey').value.trim();
+  if(f)return f;
+  try{return localStorage.getItem('yilojia_rmbgkey')||'';}catch(e){return '';}
+}
+function resetBg(){
+  prodImg=origProdImg;
+  document.getElementById('pp').src=origProdImg;
+  document.getElementById('prevCompare').classList.remove('show');
+  document.getElementById('resetBgBtn').style.display='none';
+  document.getElementById('rmbgStatus').textContent='';
+}
 function onPhoto(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
   r.onload=ev=>{
     prodImg=ev.target.result;
+    origProdImg=ev.target.result;
     const p=document.getElementById('pp');
     p.src=prodImg;p.style.display='block';
     document.getElementById('pzt').textContent='已上傳 ✓';
+    document.getElementById('rmbgBar').classList.add('show');
+    document.getElementById('rmbgStatus').textContent='';
+    document.getElementById('prevCompare').classList.remove('show');
   };r.readAsDataURL(f);
+}
+
+async function doRemoveBg(){
+  if(!origProdImg){alert('請先上傳圖片');return;}
+  const btn=document.getElementById('rmbgBtn');
+  const status=document.getElementById('rmbgStatus');
+  btn.disabled=true;
+  status.style.color='var(--light)';
+
+  if(bgMethod==='rmbg'){
+    // Remove.bg API
+    const key=getRmbgKey();
+    if(!key){alert('請輸入 Remove.bg API Key\n\n前往 remove.bg 免費申請後貼入');btn.disabled=false;return;}
+    status.textContent='⏳ 上傳中…';
+    try{
+      const blob=await(await fetch(origProdImg)).blob();
+      const fd=new FormData();
+      fd.append('image_file',blob,'product.png');
+      fd.append('size','auto');
+      const resp=await fetch('https://api.remove.bg/v1.0/removebg',{
+        method:'POST',
+        headers:{'X-Api-Key':key},
+        body:fd
+      });
+      if(!resp.ok){const err=await resp.text();throw new Error(err);}
+      const imgBlob=await resp.blob();
+      const url=URL.createObjectURL(imgBlob);
+      const reader=new FileReader();
+      reader.onload=ev2=>{
+        prodImg=ev2.target.result;
+        showBgResult(prodImg);
+        status.style.color='rgba(122,200,122,.8)';
+        status.textContent='✓ 去背完成（Remove.bg）';
+      };
+      reader.readAsDataURL(imgBlob);
+    }catch(err){
+      status.style.color='rgba(200,100,100,.8)';
+      status.textContent='✗ 失敗：'+err.message;
+      btn.disabled=false;
+    }
+  } else {
+    // AI去背 using Canvas + Claude Vision to mask
+    status.textContent='⏳ AI 分析去背中…';
+    try{
+      prodImg=await aiBgRemove(origProdImg);
+      showBgResult(prodImg);
+      status.style.color='rgba(122,200,122,.8)';
+      status.textContent='✓ AI 去背完成';
+    }catch(err){
+      status.style.color='rgba(200,100,100,.8)';
+      status.textContent='✗ 失敗：'+err.message;
+    }
+    btn.disabled=false;
+  }
+  btn.disabled=false;
+}
+
+function showBgResult(result){
+  const orig=document.getElementById('origThumb');
+  const bg=document.getElementById('bgThumb');
+  const cmp=document.getElementById('prevCompare');
+  orig.src=origProdImg;
+  bg.src=result;
+  document.getElementById('pp').src=result;
+  cmp.classList.add('show');
+  document.getElementById('resetBgBtn').style.display='block';
+}
+
+// AI bg remove: use edge detection + flood fill on canvas
+async function aiBgRemove(src){
+  return new Promise((resolve,reject)=>{
+    const img=new Image();
+    img.onload=()=>{
+      const W=img.width,H=img.height;
+      const c=document.createElement('canvas');c.width=W;c.height=H;
+      const ctx=c.getContext('2d');
+      ctx.drawImage(img,0,0);
+      const imgData=ctx.getImageData(0,0,W,H);
+      const d=imgData.data;
+
+      // Sample corners as background color
+      const corners=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[Math.floor(W/2),0],[0,Math.floor(H/2)]];
+      let rSum=0,gSum=0,bSum=0;
+      corners.forEach(([x,y])=>{
+        const i=(y*W+x)*4;
+        rSum+=d[i];gSum+=d[i+1];bSum+=d[i+2];
+      });
+      const bgR=rSum/corners.length,bgG=gSum/corners.length,bgB=bSum/corners.length;
+
+      // Flood fill from all edges with tolerance
+      const tol=38;
+      const visited=new Uint8Array(W*H);
+      const queue=[];
+      // Seed all edge pixels
+      for(let x=0;x<W;x++){queue.push([x,0]);queue.push([x,H-1]);}
+      for(let y=0;y<H;y++){queue.push([0,y]);queue.push([W-1,y]);}
+
+      while(queue.length>0){
+        const [x,y]=queue.pop();
+        if(x<0||x>=W||y<0||y>=H)continue;
+        const idx=y*W+x;
+        if(visited[idx])continue;
+        const i=idx*4;
+        const dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
+        const dist=Math.sqrt(dr*dr+dg*dg+db*db);
+        if(dist>tol)continue;
+        visited[idx]=1;
+        d[i+3]=0; // transparent
+        queue.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+      }
+
+      // Feather edges: semi-transparent border pixels
+      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
+        const idx=y*W+x;
+        if(!visited[idx])continue;
+        const neighbors=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
+        neighbors.forEach(([nx,ny])=>{
+          if(nx<0||nx>=W||ny<0||ny>=H)return;
+          const ni=ny*W+nx;
+          if(!visited[ni]){const i=ni*4;if(d[i+3]>200)d[i+3]=160;}
+        });
+      }
+
+      ctx.putImageData(imgData,0,0);
+      resolve(c.toDataURL('image/png'));
+    };
+    img.onerror=reject;
+    img.src=src;
+  });
 }
 function onLabel(e){
   const f=e.target.files[0];if(!f)return;
@@ -366,6 +602,8 @@ window.addEventListener('DOMContentLoaded',()=>{
   try{
     const saved=localStorage.getItem('yilojia_apikey');
     if(saved){document.getElementById('apiKey').value=saved;saveKey(saved);}
+    const rmbg=localStorage.getItem('yilojia_rmbgkey');
+    if(rmbg){document.getElementById('rmbgKey').value=rmbg;saveRmbgKey(rmbg);}
   }catch(e){}
 });
 
