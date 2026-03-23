@@ -144,7 +144,7 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 
     <!-- BG REMOVAL -->
     <div class="rmbg-bar" id="rmbgBar">
-      <div style="font-size:.62rem;color:var(--g2);letter-spacing:.12em;margin-bottom:.5rem">✦ 去背 / 修飾</div>
+      <div style="font-size:.62rem;color:var(--g2);letter-spacing:.12em;margin-bottom:.5rem">✦ 自動去背（上傳後立即執行）</div>
 
       <div class="rmbg-method">
         <div class="rmbg-opt on" id="mAI" onclick="pickMethod('ai')">
@@ -364,6 +364,61 @@ function resetBg(){
   document.getElementById('resetBgBtn').style.display='none';
   document.getElementById('rmbgStatus').textContent='';
 }
+
+async function autoRemoveBg(){
+  // Auto-run with current method (ai or rmbg if key exists)
+  const rmbgKey=getRmbgKey();
+  const method=rmbgKey?'rmbg':'ai';
+  if(method==='rmbg') pickMethod('rmbg'); else pickMethod('ai');
+  const status=document.getElementById('rmbgStatus');
+  const btn=document.getElementById('rmbgBtn');
+  btn.disabled=true;
+  status.style.color='var(--light)';
+  status.textContent='⏳ 自動去背中…';
+  try{
+    if(method==='rmbg'){
+      const blob=await(await fetch(origProdImg)).blob();
+      const fd=new FormData();
+      fd.append('image_file',blob,'product.png');
+      fd.append('size','auto');
+      const resp=await fetch('https://api.remove.bg/v1.0/removebg',{
+        method:'POST',headers:{'X-Api-Key':rmbgKey},body:fd
+      });
+      if(!resp.ok) throw new Error('Remove.bg 失敗，改用 AI 去背');
+      const imgBlob=await resp.blob();
+      await new Promise(res=>{
+        const reader=new FileReader();
+        reader.onload=ev=>{prodImg=ev.target.result;res();};
+        reader.readAsDataURL(imgBlob);
+      });
+    } else {
+      prodImg=await aiBgRemove(origProdImg);
+    }
+    showBgResult(prodImg);
+    status.style.color='rgba(122,200,122,.8)';
+    status.textContent='✓ 去背完成'+(method==='rmbg'?' (Remove.bg)':' (AI)');
+  }catch(err){
+    // Fallback to AI if rmbg fails
+    if(method==='rmbg'){
+      status.textContent='⏳ 改用 AI 去背中…';
+      try{
+        prodImg=await aiBgRemove(origProdImg);
+        showBgResult(prodImg);
+        status.style.color='rgba(122,200,122,.8)';
+        status.textContent='✓ AI 去背完成（Remove.bg 失敗）';
+      }catch(e){
+        status.style.color='rgba(200,100,100,.8)';
+        status.textContent='✗ 去背失敗：'+e.message;
+        prodImg=origProdImg;
+      }
+    } else {
+      status.style.color='rgba(200,100,100,.8)';
+      status.textContent='✗ 去背失敗：'+err.message;
+      prodImg=origProdImg;
+    }
+  }
+  btn.disabled=false;
+}
 function onPhoto(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
@@ -376,6 +431,9 @@ function onPhoto(e){
     document.getElementById('rmbgBar').classList.add('show');
     document.getElementById('rmbgStatus').textContent='';
     document.getElementById('prevCompare').classList.remove('show');
+    document.getElementById('resetBgBtn').style.display='none';
+    // Auto-run bg removal
+    setTimeout(()=>autoRemoveBg(),300);
   };r.readAsDataURL(f);
 }
 
