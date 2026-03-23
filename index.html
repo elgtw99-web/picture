@@ -694,11 +694,43 @@ async function analyze(ltxt,ttxt,limg){
   const resp=await fetch('https://picture.elg-tw99.workers.dev/',{
     method:'POST',
     headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:uc}]})
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:1200,messages:[{role:'user',content:uc}]})
   });
-  const d=await resp.json();
+
+  // 強化回應解析（相容手機瀏覽器）
+  if(!resp.ok){
+    const errTxt=await resp.text().catch(()=>'unknown');
+    throw new Error('API錯誤 '+resp.status+': '+errTxt.slice(0,120));
+  }
+  const raw=await resp.text();
+  let d;
+  try{ d=JSON.parse(raw); }
+  catch(e){ throw new Error('回應解析失敗: '+raw.slice(0,100)); }
+
+  if(!d||!d.content){
+    const msg=d&&d.error?d.error.message:JSON.stringify(d).slice(0,120);
+    throw new Error('API回應異常: '+msg);
+  }
   const txt=d.content.map(b=>b.text||'').join('');
-  return JSON.parse(txt.replace(/```json|```/g,'').trim());
+  const cleaned=txt.replace(/```json[\s\S]*?```|```[\s\S]*?```/g,m=>{
+    const inner=m.replace(/^```json
+?|^```
+?|```$/g,'').trim();
+    return inner;
+  }).replace(/^```json
+?|^```
+?|```$/gm,'').trim();
+
+  // 找出第一個完整 JSON 物件
+  const jsonStart=cleaned.indexOf('{');
+  const jsonEnd=cleaned.lastIndexOf('}');
+  if(jsonStart<0||jsonEnd<0) throw new Error('找不到JSON: '+cleaned.slice(0,80));
+  const jsonStr=cleaned.slice(jsonStart,jsonEnd+1);
+  try{
+    return JSON.parse(jsonStr);
+  }catch(e){
+    throw new Error('JSON解析失敗: '+e.message+' | '+jsonStr.slice(0,100));
+  }
 }
 function showAna(a){
   document.getElementById('sc').innerHTML=(a.sellingPoints||[]).map(s=>`<span class="chip">✦ ${s}</span>`).join('');
@@ -1113,47 +1145,168 @@ async function drawImg1(src,a,style,opts){
 // 圖片上疊加半透明漸層+標題+描述+場景標籤
 // ═══════════════════════════════════════════════════════
 
-// ── 生成 Pollinations AI 圖片
-async function genPollinationsImg(prompt, w=400, h=500){
-  // 將 prompt 編碼，透過 Pollinations 免費 API 取得圖片
-  const encoded = encodeURIComponent(prompt);
-  const seed = Math.floor(Math.random()*99999);
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=${w}&height=${h}&seed=${seed}&nologo=true&model=flux`;
-  return new Promise((resolve, reject)=>{
-    const img = new Image();
-    img.crossOrigin = 'anonymous';
-    img.onload = ()=> resolve(img);
-    img.onerror = ()=> {
-      // fallback: 嘗試不同seed
-      const img2 = new Image();
-      img2.crossOrigin = 'anonymous';
-      img2.onload = ()=> resolve(img2);
-      img2.onerror = ()=> reject(new Error('圖片生成失敗'));
-      img2.src = `https://image.pollinations.ai/prompt/${encoded}?width=${w}&height=${h}&seed=${seed+1}&nologo=true`;
-    };
-    img.src = url;
-  });
-}
+// ── 場景背景：Canvas 繪製（永遠可用的備用方案）
+function drawSceneBg(ctx, cx, cy, w, h, iconKey, accentCol, isDark){
+  ctx.save();
+  ctx.translate(cx, cy);
+  const hx=w/2, hy=h/2;
+  const col=accentCol||'#C4992A';
 
-// ── 根據痛點icon生成對應的英文 prompt
-function painPointToPrompt(pp, productName){
-  const base = 'cinematic beauty photography, soft luxury lighting, shallow depth of field, skin care aesthetic, no text, ';
-  const iconMap = {
-    'eye':     'close up asian woman eye area, dark circles, tired eyes, morning skincare routine, soft warm light',
-    'water':   'close up dry cracked skin texture, dehydrated skin, water droplets, moisturizing concept, macro photography',
-    'dark':    'asian woman face with dull uneven skin tone, dark spots, before skincare, natural light portrait',
-    'wrinkle': 'close up skin texture with fine lines, aging skin around eyes, wrinkles detail, macro beauty shot',
-    'pore':    'close up pore skin texture, enlarged pores, oily skin, before treatment, detailed skin macro',
-    'tired':   'asian woman looking tired, late night working, fatigue, dark under eyes, indoor warm light',
-    'sun':     'sun damaged skin concept, sunburn, UV protection, outdoor bright sunlight on skin',
-    'glow':    'dull skin vs glowing skin, lack of radiance, before transformation, natural skin portrait',
-    'firm':    'sagging skin concept, loss of elasticity, facial contour concern, close up portrait',
-    'clean':   'skincare cleansing ritual, foam cleanser, deep cleansing pores, bathroom skincare routine',
-    'skin':    'asian woman skincare concern, sensitive skin, redness, close up face portrait',
-    'clock':   'busy woman multitasking, stressed skin, time concept, working woman portrait',
+  // 底色漸層（每個場景不同色調）
+  const sceneColors={
+    'eye':    ['#1A0E1A','#2A1528'],   // 深紫夜色
+    'water':  ['#0A1828','#0E2238'],   // 深海藍
+    'dark':   ['#181010','#281818'],   // 暗棕
+    'wrinkle':['#10141A','#181E28'],   // 夜空藍
+    'pore':   ['#141A10','#1E2818'],   // 深綠
+    'tired':  ['#0E0E1A','#16162A'],   // 深夜藍紫
+    'sun':    ['#1A1208','#2A1E0A'],   // 暖棕金
+    'glow':   ['#10100A','#1E1C10'],   // 暖黑
+    'firm':   ['#180A18','#241224'],   // 深玫紫
+    'clean':  ['#0A1618','#0E2224'],   // 深青
+    'skin':   ['#18100E','#281816'],   // 深膚棕
+    'clock':  ['#0E0E0E','#181818'],   // 中性深黑
   };
-  const scenePrompt = iconMap[pp.icon] || iconMap['skin'];
-  return base + scenePrompt + ', high resolution, professional beauty campaign';
+  const [c1,c2]=sceneColors[iconKey]||['#0E0E14','#181820'];
+  const bg=ctx.createLinearGradient(-hx,-hy,hx,hy);
+  bg.addColorStop(0,c1);bg.addColorStop(1,c2);
+  ctx.fillStyle=bg;ctx.fillRect(-hx,-hy,w,h);
+
+  // 主視覺元素（大型場景圖示）
+  ctx.save();
+  switch(iconKey){
+    case 'eye':{
+      // 大眼睛特寫
+      ctx.strokeStyle=col+'55';ctx.lineWidth=3;
+      ctx.beginPath();ctx.ellipse(0,0,hx*.7,hy*.35,0,0,Math.PI*2);ctx.stroke();
+      // 虹膜
+      const iris=ctx.createRadialGradient(0,0,0,0,0,hy*.22);
+      iris.addColorStop(0,'rgba(60,40,10,1)');iris.addColorStop(.5,col+'CC');iris.addColorStop(1,col+'44');
+      ctx.fillStyle=iris;ctx.beginPath();ctx.arc(0,0,hy*.22,0,Math.PI*2);ctx.fill();
+      // 瞳孔
+      ctx.fillStyle='rgba(0,0,0,0.85)';ctx.beginPath();ctx.arc(0,0,hy*.1,0,Math.PI*2);ctx.fill();
+      // 高光
+      ctx.fillStyle='rgba(255,255,255,0.7)';ctx.beginPath();ctx.ellipse(-hy*.07,-hy*.07,hy*.04,hy*.025,-.5,0,Math.PI*2);ctx.fill();
+      // 睫毛
+      ctx.strokeStyle=col+'88';ctx.lineWidth=2;ctx.lineCap='round';
+      for(let i=0;i<7;i++){
+        const a=(-0.5+i*.18)*Math.PI;
+        const r1=hx*.7,r2=hx*.85;
+        ctx.beginPath();ctx.moveTo(Math.cos(a)*r1,Math.sin(a)*r1*.5);ctx.lineTo(Math.cos(a)*r2,Math.sin(a)*r2*.45);ctx.stroke();
+      }
+      // 暗圈
+      ctx.fillStyle='rgba(80,40,40,0.5)';ctx.beginPath();ctx.ellipse(0,hy*.18,hx*.55,hy*.12,0,0,Math.PI*2);ctx.fill();
+      break;
+    }
+    case 'water':{
+      // 龜裂大地+水滴
+      ctx.strokeStyle=col+'33';ctx.lineWidth=1.5;
+      for(let i=0;i<8;i++){
+        const x1=(-0.5+Math.random())*w,y1=(-0.5+Math.random())*h;
+        ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1+(-60+Math.random()*120),y1+(-40+Math.random()*80));ctx.stroke();
+      }
+      // 大水滴
+      ctx.fillStyle=col+'BB';ctx.beginPath();
+      ctx.moveTo(0,-hy*.55);ctx.bezierCurveTo(hx*.45,-hy*.1,hx*.45,hy*.35,0,hy*.55);
+      ctx.bezierCurveTo(-hx*.45,hy*.35,-hx*.45,-hy*.1,0,-hy*.55);ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,0.3)';ctx.beginPath();ctx.ellipse(-hx*.12,-hy*.18,hx*.08,hy*.14,-.4,0,Math.PI*2);ctx.fill();
+      break;
+    }
+    case 'tired':{
+      // 月亮+星空場景
+      ctx.fillStyle='rgba(255,255,255,0.06)';
+      for(let i=0;i<40;i++){ctx.beginPath();ctx.arc((-0.5+Math.random())*w,(-0.5+Math.random())*h,Math.random()*2,0,Math.PI*2);ctx.fill();}
+      ctx.fillStyle=col+'CC';ctx.beginPath();ctx.arc(-hx*.15,0,hy*.38,0,Math.PI*2);ctx.fill();
+      ctx.fillStyle=c2;ctx.beginPath();ctx.arc(hx*.1,0,hy*.32,0,Math.PI*2);ctx.fill();
+      // 眼皮下垂
+      ctx.strokeStyle=col+'AA';ctx.lineWidth=4;ctx.lineCap='round';
+      ctx.beginPath();ctx.moveTo(-hx*.55,hy*.35);ctx.quadraticCurveTo(0,hy*.55,hx*.55,hy*.35);ctx.stroke();
+      break;
+    }
+    case 'wrinkle':{
+      // 皮膚細紋特寫
+      ctx.strokeStyle=col+'44';ctx.lineWidth=1.5;
+      for(let r=0;r<6;r++){
+        const y0=(-0.4+r*.16)*h;
+        ctx.beginPath();ctx.moveTo(-hx,y0);
+        for(let x=-hx;x<hx;x+=20){ctx.lineTo(x,y0+(-8+Math.random()*16));}
+        ctx.lineTo(hx,y0);ctx.stroke();
+      }
+      ctx.strokeStyle=col+'88';ctx.lineWidth=2.5;
+      ctx.beginPath();ctx.moveTo(-hx*.3,-hy*.1);ctx.quadraticCurveTo(0,-hy*.2,hx*.3,-hy*.1);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(-hx*.25,hy*.08);ctx.quadraticCurveTo(0,hy*.18,hx*.25,hy*.08);ctx.stroke();
+      break;
+    }
+    case 'dark':{
+      // 臉部暗沉
+      ctx.fillStyle=col+'22';ctx.beginPath();ctx.ellipse(0,-hy*.1,hx*.38,hy*.48,0,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=col+'44';ctx.lineWidth=1.5;ctx.beginPath();ctx.ellipse(0,-hy*.1,hx*.38,hy*.48,0,0,Math.PI*2);ctx.stroke();
+      // 眼袋陰影
+      [-hx*.18,hx*.18].forEach(ex=>{
+        ctx.fillStyle='rgba(80,40,40,0.55)';ctx.beginPath();ctx.ellipse(ex,hy*.02,hx*.13,hy*.05,0,0,Math.PI*2);ctx.fill();
+      });
+      // 暗沉斑點
+      ctx.fillStyle=col+'33';
+      for(let i=0;i<12;i++){ctx.beginPath();ctx.arc((-0.3+Math.random()*.6)*w,(-0.2+Math.random()*.5)*h,3+Math.random()*8,0,Math.PI*2);ctx.fill();}
+      break;
+    }
+    case 'pore':{
+      // 毛孔放大鏡效果
+      const sizes=[[0,0,15],[hx*.3,-hy*.2,10],[- hx*.25,hy*.15,12],[hx*.1,hy*.3,8],[-hx*.35,-hy*.3,9],[hx*.4,hy*.1,7]];
+      sizes.forEach(([px,py,pr])=>{
+        ctx.fillStyle=col+'44';ctx.beginPath();ctx.ellipse(px,py,pr,pr*.7,0,0,Math.PI*2);ctx.fill();
+        ctx.strokeStyle=col+'66';ctx.lineWidth=.8;ctx.beginPath();ctx.ellipse(px,py,pr,pr*.7,0,0,Math.PI*2);ctx.stroke();
+      });
+      // 放大鏡框
+      ctx.strokeStyle=col+'88';ctx.lineWidth=3;ctx.beginPath();ctx.arc(0,0,hy*.4,0,Math.PI*2);ctx.stroke();
+      ctx.strokeStyle=col+'66';ctx.lineWidth=3;ctx.lineCap='round';ctx.beginPath();ctx.moveTo(hx*.3,hy*.3);ctx.lineTo(hx*.55,hy*.5);ctx.stroke();
+      break;
+    }
+    case 'glow':{
+      // 對比：左暗右亮
+      ctx.fillStyle='rgba(40,30,20,0.6)';ctx.fillRect(-hx,-hy,hx,h);
+      const glow=ctx.createRadialGradient(hx*.3,0,0,hx*.3,0,hx*.6);
+      glow.addColorStop(0,col+'66');glow.addColorStop(.5,col+'22');glow.addColorStop(1,'transparent');
+      ctx.fillStyle=glow;ctx.fillRect(-hx,-hy,w,h);
+      // 中線
+      ctx.strokeStyle=col+'88';ctx.lineWidth=1.5;ctx.setLineDash([6,4]);
+      ctx.beginPath();ctx.moveTo(0,-hy);ctx.lineTo(0,hy);ctx.stroke();ctx.setLineDash([]);
+      // 左側暗紋
+      ctx.strokeStyle='rgba(100,80,60,0.3)';ctx.lineWidth=1;
+      for(let i=0;i<5;i++){ctx.beginPath();ctx.moveTo(-hx,(-0.4+i*.2)*h);ctx.lineTo(-hx*.05,(-0.4+i*.2)*h);ctx.stroke();}
+      break;
+    }
+    case 'firm':{
+      // V臉輪廓+重力下垂箭頭
+      ctx.strokeStyle=col+'66';ctx.lineWidth=2;
+      ctx.beginPath();ctx.moveTo(-hx*.42,-hy*.38);ctx.quadraticCurveTo(-hx*.5,hy*.15,0,hy*.52);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(hx*.42,-hy*.38);ctx.quadraticCurveTo(hx*.5,hy*.15,0,hy*.52);ctx.stroke();
+      // 下垂暗示箭頭
+      ctx.strokeStyle='rgba(200,100,100,0.5)';ctx.lineWidth=2;ctx.lineCap='round';
+      [[-hx*.28,0],[hx*.28,0]].forEach(([ax,ay])=>{
+        ctx.beginPath();ctx.moveTo(ax,ay-hy*.15);ctx.lineTo(ax,ay+hy*.18);ctx.stroke();
+        ctx.beginPath();ctx.moveTo(ax-10,ay+hy*.08);ctx.lineTo(ax,ay+hy*.2);ctx.lineTo(ax+10,ay+hy*.08);ctx.stroke();
+      });
+      break;
+    }
+    default:{
+      // 通用：皮膚截面+清潔泡泡
+      for(let i=0;i<8;i++){
+        ctx.strokeStyle=col+(i%2===0?'44':'22');ctx.lineWidth=i%2===0?1.5:.8;
+        ctx.beginPath();ctx.arc((-0.3+Math.random()*.6)*w,(-0.3+Math.random()*.6)*h,15+Math.random()*35,0,Math.PI*2);ctx.stroke();
+      }
+      ctx.fillStyle=col+'55';ctx.beginPath();ctx.arc(0,0,hy*.3,0,Math.PI*2);ctx.fill();
+      ctx.strokeStyle=col+'99';ctx.lineWidth=2;ctx.beginPath();ctx.arc(0,0,hy*.3,0,Math.PI*2);ctx.stroke();
+    }
+  }
+  ctx.restore();
+
+  // 四邊暗角
+  const vignette=ctx.createRadialGradient(0,0,Math.min(w,h)*.2,0,0,Math.max(w,h)*.75);
+  vignette.addColorStop(0,'transparent');vignette.addColorStop(1,'rgba(0,0,0,0.55)');
+  ctx.fillStyle=vignette;ctx.fillRect(-hx,-hy,w,h);
+
+  ctx.restore();
 }
 
 async function drawImg2(src,a,style,opts){
@@ -1206,50 +1359,32 @@ async function drawImg2(src,a,style,opts){
     ctx.restore();
   });
 
-  // ── 非同步生成並繪製三張 AI 圖片
-  const imgPromises = pps.map(pp=>
-    genPollinationsImg(painPointToPrompt(pp, a.productName||''), 380, Math.round(cellH))
-      .catch(()=>null)
-  );
-
-  // 等待所有圖片（最多30秒）
-  const genImgs = await Promise.all(imgPromises);
-
-  // ── 繪製三格
+  // ── 繪製三格（Canvas 場景插圖）
   pps.forEach((pp,i)=>{
     const cx=i*cellW;
     const ccx=cx+cellW/2;
 
     ctx.save();
-    // 裁切到格子範圍
     ctx.beginPath();
     ctx.rect(cx,cellTop,cellW,cellH);
     ctx.clip();
 
-    // AI 生成圖片（全格鋪滿）
-    if(genImgs[i]){
-      // 計算 cover 縮放
-      const gi=genImgs[i];
-      const scaleX=cellW/gi.width, scaleY=cellH/gi.height;
-      const scale=Math.max(scaleX,scaleY);
-      const dw=gi.width*scale, dh=gi.height*scale;
-      const dx=cx+(cellW-dw)/2, dy=cellTop+(cellH-dh)/2;
-      ctx.drawImage(gi,dx,dy,dw,dh);
-    }
+    // Canvas 場景背景繪製
+    drawSceneBg(ctx, ccx, cellTop+cellH/2, cellW, cellH, pp.icon||'skin', th.accent, isDark);
 
     // 底部漸層遮罩（讓文字清晰）
-    const maskH=cellH*.52;
+    const maskH=cellH*.5;
     const maskY=cellBot-maskH;
     const mg=ctx.createLinearGradient(cx,maskY,cx,cellBot);
     mg.addColorStop(0,'transparent');
-    mg.addColorStop(.35,isDark?'rgba(14,10,4,0.72)':'rgba(22,16,6,0.68)');
-    mg.addColorStop(1,isDark?'rgba(14,10,4,0.92)':'rgba(18,12,4,0.88)');
+    mg.addColorStop(.3,'rgba(10,7,2,0.75)');
+    mg.addColorStop(1,'rgba(10,7,2,0.94)');
     ctx.fillStyle=mg;ctx.fillRect(cx,maskY,cellW,maskH);
 
-    // 中間格頂部也加半透明遮罩（讓標題可見）
-    const topMask=ctx.createLinearGradient(cx,cellTop,cx,cellTop+cellH*.2);
-    topMask.addColorStop(0,'rgba(0,0,0,0.45)');topMask.addColorStop(1,'transparent');
-    ctx.fillStyle=topMask;ctx.fillRect(cx,cellTop,cellW,cellH*.2);
+    // 頂部遮罩
+    const topMask=ctx.createLinearGradient(cx,cellTop,cx,cellTop+cellH*.22);
+    topMask.addColorStop(0,'rgba(0,0,0,0.5)');topMask.addColorStop(1,'transparent');
+    ctx.fillStyle=topMask;ctx.fillRect(cx,cellTop,cellW,cellH*.22);
 
     ctx.restore();
 
