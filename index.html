@@ -377,7 +377,10 @@ async function autoRemoveBg(){
   status.textContent='⏳ 自動去背中…';
   try{
     if(method==='rmbg'){
-      const blob=await(await fetch(origProdImg)).blob();
+      const b64d=origProdImg.split(',')[1];
+      const bStr=atob(b64d);const bArr=new Uint8Array(bStr.length);
+      for(let bi=0;bi<bStr.length;bi++) bArr[bi]=bStr.charCodeAt(bi);
+      const blob=new Blob([bArr],{type:'image/png'});
       const fd=new FormData();
       fd.append('image_file',blob,'product.png');
       fd.append('size','auto');
@@ -450,7 +453,10 @@ async function doRemoveBg(){
     if(!key){alert('請輸入 Remove.bg API Key\n\n前往 remove.bg 免費申請後貼入');btn.disabled=false;return;}
     status.textContent='⏳ 上傳中…';
     try{
-      const blob=await(await fetch(origProdImg)).blob();
+      const b64d2=origProdImg.split(',')[1];
+      const bStr2=atob(b64d2);const bArr2=new Uint8Array(bStr2.length);
+      for(let bi=0;bi<bStr2.length;bi++) bArr2[bi]=bStr2.charCodeAt(bi);
+      const blob=new Blob([bArr2],{type:'image/png'});
       const fd=new FormData();
       fd.append('image_file',blob,'product.png');
       fd.append('size','auto');
@@ -508,53 +514,55 @@ async function aiBgRemove(src){
   return new Promise((resolve,reject)=>{
     const img=new Image();
     img.onload=()=>{
-      const W=img.width,H=img.height;
+      // Downscale large images to prevent browser hang
+      const MAX=600;
+      let W=img.width, H=img.height;
+      if(W>MAX||H>MAX){const sc=MAX/Math.max(W,H);W=Math.round(W*sc);H=Math.round(H*sc);}
+
       const c=document.createElement('canvas');c.width=W;c.height=H;
       const ctx=c.getContext('2d');
-      ctx.drawImage(img,0,0);
+      ctx.drawImage(img,0,0,W,H);
       const imgData=ctx.getImageData(0,0,W,H);
       const d=imgData.data;
 
-      // Sample corners as background color
-      const corners=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[Math.floor(W/2),0],[0,Math.floor(H/2)]];
-      let rSum=0,gSum=0,bSum=0;
-      corners.forEach(([x,y])=>{
-        const i=(y*W+x)*4;
-        rSum+=d[i];gSum+=d[i+1];bSum+=d[i+2];
-      });
-      const bgR=rSum/corners.length,bgG=gSum/corners.length,bgB=bSum/corners.length;
+      // Sample background colour from corners + edges
+      const samples=[[0,0],[W-1,0],[0,H-1],[W-1,H-1],[Math.floor(W/2),0],[0,Math.floor(H/2)],[W-1,Math.floor(H/2)],[Math.floor(W/2),H-1]];
+      let rS=0,gS=0,bS=0;
+      samples.forEach(([x,y])=>{const i=(y*W+x)*4;rS+=d[i];gS+=d[i+1];bS+=d[i+2];});
+      const bgR=rS/samples.length,bgG=gS/samples.length,bgB=bS/samples.length;
 
-      // Flood fill from all edges with tolerance
-      const tol=38;
+      // Flat int32 queue (much faster than array of arrays)
+      const tol=42;
       const visited=new Uint8Array(W*H);
-      const queue=[];
-      // Seed all edge pixels
-      for(let x=0;x<W;x++){queue.push([x,0]);queue.push([x,H-1]);}
-      for(let y=0;y<H;y++){queue.push([0,y]);queue.push([W-1,y]);}
+      const queue=new Int32Array(W*H*2);
+      let qHead=0,qTail=0;
 
-      while(queue.length>0){
-        const [x,y]=queue.pop();
-        if(x<0||x>=W||y<0||y>=H)continue;
+      const enq=(x,y)=>{if(x>=0&&x<W&&y>=0&&y<H&&!visited[y*W+x]){queue[qTail++]=x;queue[qTail++]=y;}};
+
+      // Seed edges
+      for(let x=0;x<W;x++){enq(x,0);enq(x,H-1);}
+      for(let y=1;y<H-1;y++){enq(0,y);enq(W-1,y);}
+
+      while(qHead<qTail){
+        const x=queue[qHead++],y=queue[qHead++];
         const idx=y*W+x;
-        if(visited[idx])continue;
+        if(visited[idx]) continue;
         const i=idx*4;
         const dr=d[i]-bgR,dg=d[i+1]-bgG,db=d[i+2]-bgB;
-        const dist=Math.sqrt(dr*dr+dg*dg+db*db);
-        if(dist>tol)continue;
+        if(Math.sqrt(dr*dr+dg*dg+db*db)>tol) continue;
         visited[idx]=1;
-        d[i+3]=0; // transparent
-        queue.push([x+1,y],[x-1,y],[x,y+1],[x,y-1]);
+        d[i+3]=0;
+        enq(x+1,y);enq(x-1,y);enq(x,y+1);enq(x,y-1);
       }
 
-      // Feather edges: semi-transparent border pixels
-      for(let y=0;y<H;y++)for(let x=0;x<W;x++){
-        const idx=y*W+x;
-        if(!visited[idx])continue;
-        const neighbors=[[x+1,y],[x-1,y],[x,y+1],[x,y-1]];
-        neighbors.forEach(([nx,ny])=>{
-          if(nx<0||nx>=W||ny<0||ny>=H)return;
+      // Soft edge feather
+      for(let p=0;p<W*H;p++){
+        if(!visited[p]) continue;
+        const x=p%W,y=Math.floor(p/W);
+        [[x+1,y],[x-1,y],[x,y+1],[x,y-1]].forEach(([nx,ny])=>{
+          if(nx<0||nx>=W||ny<0||ny>=H) return;
           const ni=ny*W+nx;
-          if(!visited[ni]){const i=ni*4;if(d[i+3]>200)d[i+3]=160;}
+          if(!visited[ni]&&d[ni*4+3]>180) d[ni*4+3]=140;
         });
       }
 
