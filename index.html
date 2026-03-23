@@ -1532,129 +1532,163 @@ async function drawImg3(src,a,style,opts){
 
 // ═══════════════════════════════════════════════════════
 // IMAGE 4 ── 情感共鳴圖（氛圍沉浸式）
-// 全版暈染漸層，產品透明疊加做底，
-// 大字排版佔滿畫面，局部金色光柱，
-// 底部三個使用情境「moment」標籤
+// 左側文字排版合理：標語一行最多6字，字體固定38px
+// 右側產品圖，底部情境標籤，整體均衡
 // ═══════════════════════════════════════════════════════
 async function drawImg4(src,a,style,opts){
   const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
   const img=await loadImg(src);
   const S=SZ;
 
-  // ── 全版大氛圍漸層
+  // ── 背景
   th.bg(ctx,S);
 
-  // 多層光暈疊加，營造深度
+  // 多層光暈
   ctx.save();
-  const layers=[
-    {x:S*.15,y:S*.2,r:S*.55,col:th.accent+'20'},
-    {x:S*.85,y:S*.7,r:S*.5,col:th.accent2||th.accent+'18'},
-    {x:S*.5,y:S*.5,r:S*.35,col:'rgba(255,255,255,0.12)'},
-  ];
-  layers.forEach(l=>{
-    const g=ctx.createRadialGradient(l.x,l.y,0,l.x,l.y,l.r);
-    g.addColorStop(0,l.col);g.addColorStop(1,'transparent');
+  [[S*.18,S*.22,S*.5],[S*.82,S*.72,S*.45],[S*.5,S*.5,S*.3]].forEach(([gx,gy,gr])=>{
+    const g=ctx.createRadialGradient(gx,gy,0,gx,gy,gr);
+    g.addColorStop(0,th.accent+'1A');g.addColorStop(1,'transparent');
     ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
   });
   ctx.restore();
 
-  // ── 光柱（斜向）
-  ctx.save();
-  ctx.globalAlpha=.06;
-  const lineGrad=ctx.createLinearGradient(0,0,S,S*.8);
-  lineGrad.addColorStop(0,'transparent');
-  lineGrad.addColorStop(.4,th.accent);
-  lineGrad.addColorStop(1,'transparent');
-  ctx.fillStyle=lineGrad;
-  for(let i=0;i<5;i++){
-    const lx=i*S*.22-S*.1;
-    ctx.save();ctx.translate(lx,0);ctx.rotate(.12);
-    ctx.fillRect(0,-S*.1,22,S*1.4);
+  // 斜向光柱（右半，低調）
+  ctx.save();ctx.globalAlpha=.05;
+  for(let i=0;i<4;i++){
+    const lx=S*.4+i*S*.18;
+    ctx.save();ctx.translate(lx,0);ctx.rotate(.1);
+    ctx.fillStyle=th.accent;
+    ctx.fillRect(0,-S*.1,14,S*1.3);
     ctx.restore();
   }
   ctx.restore();
 
-  // ── 產品大圖，半透明做背景底
-  ctx.save();ctx.globalAlpha=.12;
-  fitProd(ctx,img,S*.72,S*.42,S*.7,S*.7);
+  // 粒子
+  if(opts.particles){
+    ctx.save();
+    for(let i=0;i<35;i++){
+      ctx.fillStyle=th.accent+(Math.random()>.7?'22':'12');
+      ctx.beginPath();ctx.arc(Math.random()*S,Math.random()*S,.5+Math.random()*2,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
+
+  // ── 產品圖（右半，垂直居中）
+  ctx.save();ctx.globalAlpha=.1;
+  fitProd(ctx,img,S*.7,S*.48,S*.55,S*.55);
+  ctx.restore();
+  ctx.save();ctx.globalAlpha=.93;
+  fitProd(ctx,img,S*.7,S*.48,S*.42,S*.42);
   ctx.restore();
 
-  // ── 全版大字排版（左側，豎向感）
-  ctx.save();
-  // 極小眉題
-  ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
-  ctx.fillStyle=th.accent+'AA';ctx.textAlign='left';
-  ctx.fillText('FEEL THE DIFFERENCE',S*.08,S*.14);
+  // ── 左側文字排版
+  const leftX = S*.08;
 
-  // 主標語超大字
-  const scene=a.dreamScene||'煥然新生';
-  const sz=scene.length<=6?S*.12:scene.length<=10?S*.09:S*.07;
-  ctx.font=`700 ${sz}px 'Noto Serif TC',serif`;
+  // 眉題
+  ctx.save();
+  ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=th.accent+'AA';ctx.textAlign='left';
+  ctx.fillText('FEEL THE DIFFERENCE',leftX,S*.14);
+  ctx.restore();
+
+  // 細金線
+  ctx.save();
+  ctx.strokeStyle=th.accent+'55';ctx.lineWidth=1;
+  ctx.beginPath();ctx.moveTo(leftX,S*.155);ctx.lineTo(S*.42,S*.155);ctx.stroke();
+  ctx.restore();
+
+  // 主標語：固定38px，每行最多7字，最多3行
+  const scene = a.dreamScene||'煥發肌膚光采';
+  ctx.save();
+  ctx.textAlign='left';
+  const fontSize=38;
+  ctx.font=`600 ${fontSize}px 'Noto Serif TC',serif`;
   ctx.fillStyle=th.textDark;
-  // 逐字換行（每4字一行）
-  const chunks=[];
-  for(let i=0;i<scene.length;i+=4)chunks.push(scene.slice(i,i+4));
-  chunks.forEach((ch,ci)=>{
-    ctx.fillText(ch,S*.08,S*.24+ci*(sz+S*.018));
+  const maxCharsPerLine=7;
+  const lines=[];
+  for(let i=0;i<scene.length;i+=maxCharsPerLine){
+    lines.push(scene.slice(i,i+maxCharsPerLine));
+    if(lines.length>=3) break;
+  }
+  lines.forEach((line,li)=>{
+    ctx.fillText(line, leftX, S*.22 + li*(fontSize+S*.018));
   });
   ctx.restore();
 
-  // ── 產品實圖（前景，右偏）
-  ctx.save();ctx.globalAlpha=.95;
-  fitProd(ctx,img,S*.68,S*.47,S*.52,S*.52);
+  // 副標（tagline）
+  if(opts.tagline && a.tagline){
+    ctx.save();
+    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
+    ctx.fillStyle=th.accent+'CC';ctx.textAlign='left';
+    ctx.fillText(a.tagline, leftX, S*.22 + lines.length*(fontSize+S*.018) + S*.018);
+    ctx.restore();
+  }
+
+  // 細金線
+  const textBottomY = S*.22 + lines.length*(fontSize+S*.018) + (opts.tagline?S*.062:S*.02);
+  ctx.save();
+  ctx.strokeStyle=th.accent+'44';ctx.lineWidth=.8;
+  ctx.beginPath();ctx.moveTo(leftX,textBottomY);ctx.lineTo(S*.42,textBottomY);ctx.stroke();
   ctx.restore();
 
-  // ── 賣點條（左下，垂直排列）
+  // 賣點列表（3條，帶左側金條）
   const sps=(a.sellingPoints||[]).slice(0,3);
   sps.forEach((sp,i)=>{
-    const sy=S*.68+i*S*.088;
+    const sy=textBottomY+S*.045+i*S*.075;
     ctx.save();
-    // 左側金條
     ctx.fillStyle=th.accent;
-    ctx.fillRect(S*.08,sy-S*.016,3,S*.05);
-    ctx.font=`400 ${15}px 'Noto Serif TC',serif`;
+    ctx.fillRect(leftX,sy-S*.014,3,S*.042);
+    ctx.font=`400 ${14}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.textDark;ctx.textAlign='left';
-    ctx.fillText(sp,S*.1,sy+S*.006);
+    // 超長截斷
+    const spText=sp.length>12?sp.slice(0,12)+'…':sp;
+    ctx.fillText(spText, leftX+S*.016, sy+S*.008);
     ctx.restore();
   });
 
-  // ── 底部「moment」情境標籤
+  // ── 底部情境標籤（橫排三個）
   const moments=[
-    {icon:'🌅',t:'晨間喚醒肌膚'},
-    {icon:'✨',t:'夜間深層修護'},
-    {icon:'💧',t:'全天候保濕鎖水'},
+    {icon:'🌅', t:'晨間喚醒'},
+    {icon:'✨', t:'夜間深層修護'},
+    {icon:'💧', t:'全天候保濕'},
   ];
-  const mw=S*.26,mh=S*.065;
+  const mW=S*.255, mH=S*.058, mY=S*.878;
   moments.forEach((m,i)=>{
-    const mx=S*.07+i*(mw+S*.015);
-    const my=S*.9;
+    const mX=S*.06+i*(mW+S*.016);
     ctx.save();
-    ctx.fillStyle=th.cardBg||'rgba(255,255,255,0.65)';
-    rr(ctx,mx,my,mw,mh,mh/2);ctx.fill();
-    ctx.strokeStyle=th.accent+'44';ctx.lineWidth=.8;
-    rr(ctx,mx,my,mw,mh,mh/2);ctx.stroke();
+    ctx.fillStyle=th.cardBg||'rgba(255,255,255,0.6)';
+    rr(ctx,mX,mY,mW,mH,mH/2);ctx.fill();
+    ctx.strokeStyle=th.accent+'3A';ctx.lineWidth=.8;
+    rr(ctx,mX,mY,mW,mH,mH/2);ctx.stroke();
     ctx.font=`400 ${13}px sans-serif`;
     ctx.fillStyle=th.accent;ctx.textAlign='center';
-    ctx.fillText(m.icon,mx+S*.028,my+mh*.62);
+    ctx.fillText(m.icon,mX+S*.028,mY+mH*.64);
     ctx.font=`400 ${12}px 'Noto Sans TC',sans-serif`;
     ctx.fillStyle=th.textDark;
-    ctx.fillText(m.t,mx+mw*.55,my+mh*.62);
+    ctx.fillText(m.t,mX+mW*.55,mY+mH*.64);
     ctx.restore();
   });
 
-  // ── 右下品牌
+  // 底部小字
+  ctx.save();
+  ctx.font=`300 ${11}px 'Noto Sans TC',sans-serif`;
+  ctx.fillStyle=th.accent+'55';ctx.textAlign='left';
+  ctx.fillText('情境氛圍，引發購買想像',S*.06,S*.955);
+  ctx.restore();
+
+  // 品牌右下
   ctx.save();
   ctx.font=`400 ${17}px 'Noto Serif TC',serif`;
   ctx.fillStyle=th.brandColor;ctx.textAlign='right';
-  ctx.fillText('依洛嘉國際',S*.95,S*.96);
-  // 小線裝飾
-  ctx.strokeStyle=th.accent+'44';ctx.lineWidth=.8;
-  ctx.beginPath();ctx.moveTo(S*.66,S*.958);ctx.lineTo(S*.82,S*.958);ctx.stroke();
+  ctx.fillText('依洛嘉國際',S*.95,S*.955);
+  ctx.strokeStyle=th.accent+'33';ctx.lineWidth=.7;
+  ctx.beginPath();ctx.moveTo(S*.64,S*.944);ctx.lineTo(S*.82,S*.944);ctx.stroke();
   ctx.restore();
 
   drawBorder(ctx,th.accent+'33',false);
   return c;
 }
+
 </script>
 </body>
 </html>
