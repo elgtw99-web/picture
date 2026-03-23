@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>依洛嘉國際 · 展示圖系統 v3</title>
+<title>依洛嘉國際 · 產品展示圖系統</title>
 <link href="https://fonts.googleapis.com/css2?family=Noto+Serif+TC:wght@300;400;500;600;700;900&family=Noto+Sans+TC:wght@300;400;500;700&family=Cormorant+Garamond:ital,wght@0,300;0,400;0,600;1,300&display=swap" rel="stylesheet">
 <style>
 :root{
@@ -202,6 +202,24 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
     <textarea id="ttxt" style="min-height:55px" placeholder="例：30-45歲熟齡女性，抗老保濕…"></textarea>
   </div>
 
+  <!-- API KEY -->
+  <div class="sec">
+    <div class="sec-lbl">06 · Anthropic API Key</div>
+    <div style="position:relative">
+      <input type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-family:'Noto Sans TC',sans-serif;font-size:.74rem;padding:.75rem 2.6rem .75rem .8rem;outline:none;transition:border-color .2s"
+        oninput="saveKey(this.value)"
+        onfocus="this.style.borderColor='var(--g1)'"
+        onblur="this.style.borderColor='rgba(196,153,42,.16)'">
+      <span id="eyeBtn" onclick="toggleKey()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);cursor:pointer;font-size:.8rem;color:var(--light);user-select:none">👁</span>
+    </div>
+    <div style="margin-top:.55rem;font-size:.6rem;color:rgba(168,144,112,.5);line-height:1.6">
+      金鑰僅存於本機瀏覽器，不會上傳至任何伺服器。<br>
+      取得金鑰：<a href="https://console.anthropic.com/keys" target="_blank" style="color:var(--g2);text-decoration:none">console.anthropic.com</a>
+    </div>
+    <div id="keyStatus" style="margin-top:.4rem;font-size:.62rem;display:none"></div>
+  </div>
+
   <button class="btn" id="genBtn" onclick="doGen()">
     <span id="btnTxt">✦ 生成四張展示圖</span>
     <div class="spin" id="sp"></div>
@@ -320,6 +338,37 @@ async function doGen(){
   document.getElementById('sp').style.display='none';
 }
 
+// ─── API KEY MANAGEMENT ───
+function saveKey(v){
+  try{localStorage.setItem('yilojia_apikey',v);}catch(e){}
+  const s=document.getElementById('keyStatus');
+  if(v.startsWith('sk-ant')){
+    s.style.display='block';s.style.color='rgba(122,200,122,.8)';s.textContent='✓ 格式正確';
+  } else if(v.length>0){
+    s.style.display='block';s.style.color='rgba(200,100,100,.8)';s.textContent='⚠ 金鑰格式有誤';
+  } else {
+    s.style.display='none';
+  }
+}
+function getKey(){
+  const f=document.getElementById('apiKey').value.trim();
+  if(f) return f;
+  try{return localStorage.getItem('yilojia_apikey')||'';}catch(e){return '';}
+}
+function toggleKey(){
+  const inp=document.getElementById('apiKey');
+  const btn=document.getElementById('eyeBtn');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}
+  else{inp.type='password';btn.textContent='👁';}
+}
+// Restore saved key on load
+window.addEventListener('DOMContentLoaded',()=>{
+  try{
+    const saved=localStorage.getItem('yilojia_apikey');
+    if(saved){document.getElementById('apiKey').value=saved;saveKey(saved);}
+  }catch(e){}
+});
+
 // ─── AI ANALYSIS ───
 async function analyze(ltxt,ttxt,limg){
   const uc=[];
@@ -339,7 +388,13 @@ async function analyze(ltxt,ttxt,limg){
   "usage":"使用方式15字內",
   "spec":"規格說明，如30ml/50g/30入"
 }`});
-  const resp=await fetch('https://api.anthropic.com/v1/messages',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:uc}]})});
+  const key=getKey();
+  if(!key){throw new Error('請先輸入 Anthropic API Key');}
+  const resp=await fetch('https://picture.elg-tw99.workers.dev/',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:uc}]})
+  });
   const d=await resp.json();
   const txt=d.content.map(b=>b.text||'').join('');
   return JSON.parse(txt.replace(/```json|```/g,'').trim());
