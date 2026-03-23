@@ -36,7 +36,7 @@ body{background:#181208;font-family:'Noto Sans TC',sans-serif;color:#FAF8F2;min-
 .upz input{position:absolute;inset:0;opacity:0;cursor:pointer;font-size:0}
 .upz-ico{width:34px;height:34px;margin:0 auto .6rem;opacity:.4}
 .upz-txt{font-size:.72rem;color:var(--light);line-height:1.6}
-.prev{width:100%;max-height:150px;object-fit:contain;display:none;margin-top:.6rem;border-radius:8px;background:rgba(255,255,255,.05)}
+.prev{width:100%;max-height:160px;object-fit:contain;display:none;margin-top:.8rem;border-radius:8px;background:rgba(255,255,255,.06);border:1px solid rgba(196,153,42,.12)}
 
 /* TEXTAREA */
 textarea{width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-family:'Noto Sans TC',sans-serif;font-size:.76rem;line-height:1.75;padding:.8rem;resize:vertical;min-height:78px;transition:border-color .2s}
@@ -144,7 +144,7 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 
     <!-- BG REMOVAL -->
     <div class="rmbg-bar" id="rmbgBar">
-      <div style="font-size:.62rem;color:var(--g2);letter-spacing:.12em;margin-bottom:.5rem">✦ 自動去背（上傳後立即執行）</div>
+      <div style="font-size:.62rem;color:var(--g2);letter-spacing:.12em;margin-bottom:.5rem">✦ 去背選項（選填，可跳過）</div>
 
       <div class="rmbg-method">
         <div class="rmbg-opt on" id="mAI" onclick="pickMethod('ai')">
@@ -177,7 +177,7 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
         <div id="rmbgKeyStatus" style="font-size:.6rem;margin-top:.25rem;min-height:.8rem"></div>
       </div>
 
-      <button class="rmbg-btn" id="rmbgBtn" onclick="doRemoveBg()">✦ 執行去背</button>
+      <button class="rmbg-btn" id="rmbgBtn" onclick="doRemoveBg()">✦ 執行去背（選填）</button>
       <div class="rmbg-status" id="rmbgStatus"></div>
 
       <!-- Before / After compare -->
@@ -416,10 +416,12 @@ async function autoRemoveBg(){
       }
     } else {
       status.style.color='rgba(200,100,100,.8)';
-      status.textContent='✗ 去背失敗：'+err.message;
-      prodImg=origProdImg;
+      status.textContent='✗ 去背失敗，使用原圖';
+      prodImg=origProdImg; // 確保原圖可用
     }
   }
+  // 確保 prodImg 一定有值
+  if(!prodImg) prodImg=origProdImg;
   btn.disabled=false;
 }
 function onPhoto(e){
@@ -428,15 +430,21 @@ function onPhoto(e){
   r.onload=ev=>{
     prodImg=ev.target.result;
     origProdImg=ev.target.result;
+    // 顯示預覽圖
     const p=document.getElementById('pp');
-    p.src=prodImg;p.style.display='block';
-    document.getElementById('pzt').textContent='已上傳 ✓';
+    p.src=prodImg;
+    p.style.display='block';
+    p.style.maxHeight='160px';
+    p.style.width='100%';
+    p.style.objectFit='contain';
+    // 隱藏上傳圖示，顯示已上傳狀態
+    document.querySelector('#pz .upz-ico').style.display='none';
+    document.getElementById('pzt').innerHTML='✓ 已上傳 — <span style="font-size:.6rem;opacity:.6">點擊可更換</span>';
+    // 顯示去背選項
     document.getElementById('rmbgBar').classList.add('show');
     document.getElementById('rmbgStatus').textContent='';
     document.getElementById('prevCompare').classList.remove('show');
     document.getElementById('resetBgBtn').style.display='none';
-    // Auto-run bg removal
-    setTimeout(()=>autoRemoveBg(),300);
   };r.readAsDataURL(f);
 }
 
@@ -576,7 +584,16 @@ async function aiBgRemove(src){
 function onLabel(e){
   const f=e.target.files[0];if(!f)return;
   const r=new FileReader();
-  r.onload=ev=>{labelImg=ev.target.result;const p=document.getElementById('lp2');p.src=labelImg;p.style.display='block';};
+  r.onload=ev=>{
+    labelImg=ev.target.result;
+    const p=document.getElementById('lp2');
+    p.src=labelImg;
+    p.style.display='block';
+    p.style.maxHeight='120px';
+    p.style.width='100%';
+    p.style.objectFit='contain';
+    document.querySelector('#lz .upz-txt').innerHTML='✓ 標籤已上傳';
+  };
   r.readAsDataURL(f);
 }
 
