@@ -1051,9 +1051,9 @@ async function drawImg1(src,a,style,opts){
 }
 
 // ═══════════════════════════════════════════════════════
-// IMAGE 2 ── 成分星圖（圓形軌道佈局）
-// 產品正中央，六顆成分以橢圓軌道環繞，
-// 每顆成分有獨立光暈+連線，背景有星雲感
+// IMAGE 2 ── 成分圍繞圖（重構版）
+// 產品居中偏下，六成分固定六角位，文字往外展開
+// 每個成分有圓泡+符號+名稱+功效，連線清晰不重疊
 // ═══════════════════════════════════════════════════════
 async function drawImg2(src,a,style,opts){
   const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
@@ -1061,113 +1061,155 @@ async function drawImg2(src,a,style,opts){
   const ings=(a.ingredients||[]).slice(0,6);
   const S=SZ;
 
+  // ── 背景
   th.bg(ctx,S);
 
-  // ── 星雲背景暈染
-  ctx.save();
-  [[S*.5,S*.48,320],[S*.2,S*.2,200],[S*.8,S*.8,180]].forEach(([gx,gy,gr])=>{
-    const g=ctx.createRadialGradient(gx,gy,0,gx,gy,gr);
-    g.addColorStop(0,th.accent+'18');g.addColorStop(1,'transparent');
-    ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
-  });
-  ctx.restore();
+  // 中心柔光
+  const cg=ctx.createRadialGradient(S*.5,S*.52,0,S*.5,S*.52,S*.45);
+  cg.addColorStop(0,th.accent+'15');cg.addColorStop(1,'transparent');
+  ctx.fillStyle=cg;ctx.fillRect(0,0,S,S);
 
-  // ── 軌道橢圓（三圈）
-  ctx.save();
-  [S*.36,S*.42,S*.47].forEach((rx,i)=>{
-    ctx.strokeStyle=th.accent+(i===0?'25':i===1?'18':'10');
-    ctx.lineWidth=i===0?1.2:.7;
-    ctx.setLineDash(i===1?[6,8]:[]);
-    ctx.beginPath();ctx.ellipse(S/2,S*.5,rx,rx*.7,-.15,0,Math.PI*2);ctx.stroke();
-  });
-  ctx.setLineDash([]);
-  ctx.restore();
+  if(opts.particles){
+    ctx.save();
+    for(let i=0;i<30;i++){
+      ctx.fillStyle=th.accent+'18';
+      ctx.beginPath();ctx.arc(Math.random()*S,Math.random()*S,.8+Math.random()*2,0,Math.PI*2);ctx.fill();
+    }
+    ctx.restore();
+  }
 
-  // ── 頂部標題
+  // ── 標題區（頂部）
   ctx.save();ctx.textAlign='center';
-  ctx.font=`600 ${26}px 'Noto Serif TC',serif`;
+  ctx.font=`700 ${28}px 'Noto Serif TC',serif`;
   ctx.fillStyle=th.textDark;
-  ctx.fillText(a.productName||'',S*.5,S*.09);
+  ctx.fillText('【'+(a.productName||'')+'】成分解析',S*.5,S*.085);
   if(opts.tagline){
-    ctx.font=`300 ${15}px 'Noto Serif TC',serif`;
+    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.accent;
-    ctx.fillText(a.tagline||'',S*.5,S*.12);
+    ctx.fillText(a.tagline||'',S*.5,S*.118);
   }
   ctx.restore();
-  ornLine(ctx,S*.2,S*.138,S*.8,S*.138,th.accent+'44');
+  // 裝飾線
+  ornLine(ctx,S*.18,S*.138,S*.82,S*.138,th.accent+'44');
 
-  // ── 產品居中（中等大小，讓成分有空間）
-  // Drop shadow effect
-  ctx.save();ctx.globalAlpha=.18;
-  const shg=ctx.createRadialGradient(S*.5,S*.56,0,S*.5,S*.56,180);
-  shg.addColorStop(0,'rgba(0,0,0,0.5)');shg.addColorStop(1,'transparent');
-  ctx.fillStyle=shg;ctx.fillRect(0,0,S,S);
+  // ── 產品居中
+  const prodCX=S*.5, prodCY=S*.52;
+  // 產品背後光暈
+  const pg=ctx.createRadialGradient(prodCX,prodCY,0,prodCX,prodCY,S*.18);
+  pg.addColorStop(0,'rgba(255,255,255,0.18)');pg.addColorStop(1,'transparent');
+  ctx.fillStyle=pg;ctx.fillRect(0,0,S,S);
+
+  fitProd(ctx,img,prodCX,prodCY,S*.28,S*.28);
+
+  // ── 六成分：六角形固定位置
+  // 上中、右上、右下、下中、左下、左上
+  const N=ings.length;
+  // 六個固定角度（從頂部順時針）
+  const angles=[
+    -Math.PI/2,           // 正上
+    -Math.PI/2+Math.PI/3, // 右上
+    -Math.PI/2+2*Math.PI/3,// 右下
+    Math.PI/2,            // 正下
+    -Math.PI/2-2*Math.PI/3,// 左下
+    -Math.PI/2-Math.PI/3, // 左上
+  ];
+
+  // 軌道半徑（橢圓，水平稍寬）
+  const RX=S*.33, RY=S*.29;
+
+  // 先畫軌道圓（裝飾）
+  ctx.save();
+  ctx.strokeStyle=th.accent+'20';ctx.lineWidth=1;
+  ctx.setLineDash([5,7]);
+  ctx.beginPath();ctx.ellipse(prodCX,prodCY,RX,RY,0,0,Math.PI*2);ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.strokeStyle=th.accent+'0E';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.ellipse(prodCX,prodCY,RX*1.08,RY*1.08,0,0,Math.PI*2);ctx.stroke();
   ctx.restore();
-  fitProd(ctx,img,S*.5,S*.5,340,340);
 
-  // ── 成分圓環（6顆，橢圓軌道）
   ings.forEach((ing,i)=>{
-    const angle=(i/ings.length)*Math.PI*2-Math.PI/2;
-    const rx=S*.41,ry=S*.3;
-    const bx=S*.5+rx*Math.cos(angle);
-    const by=S*.5+ry*Math.sin(angle);
+    const angle=angles[i]||((i/N)*Math.PI*2-Math.PI/2);
+    const bx=prodCX+RX*Math.cos(angle);
+    const by=prodCY+RY*Math.sin(angle);
 
-    // 連線
+    // 連線（產品中心 → 泡泡）
     if(opts.radial){
       ctx.save();
-      const grad=ctx.createLinearGradient(S*.5,S*.5,bx,by);
-      grad.addColorStop(0,'transparent');
-      grad.addColorStop(.4,th.accent+'22');
-      grad.addColorStop(1,th.accent+'55');
-      ctx.strokeStyle=grad;ctx.lineWidth=1;
-      ctx.setLineDash([3,5]);
-      ctx.beginPath();ctx.moveTo(S*.5,S*.5);ctx.lineTo(bx,by);ctx.stroke();
+      const gl=ctx.createLinearGradient(prodCX,prodCY,bx,by);
+      gl.addColorStop(0,'transparent');
+      gl.addColorStop(.5,th.accent+'28');
+      gl.addColorStop(1,th.accent+'55');
+      ctx.strokeStyle=gl;ctx.lineWidth=1;
+      ctx.setLineDash([4,6]);
+      ctx.beginPath();ctx.moveTo(prodCX,prodCY);ctx.lineTo(bx,by);ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
     }
 
-    // 光暈
+    // 泡泡光暈
     ctx.save();
-    const hg=ctx.createRadialGradient(bx,by,0,bx,by,S*.07);
-    hg.addColorStop(0,th.accent+'33');hg.addColorStop(1,'transparent');
+    const hg=ctx.createRadialGradient(bx,by,0,bx,by,S*.065);
+    hg.addColorStop(0,th.accent+'22');hg.addColorStop(1,'transparent');
     ctx.fillStyle=hg;ctx.fillRect(0,0,S,S);
     ctx.restore();
 
-    // 成分圓球
-    const br=S*.052;
-    drawBubble(ctx,bx,by,br,th.accent+'22',th.accent+'77');
-    // 內圈
-    drawBubble(ctx,bx,by,br*.65,th.accent+'18',th.accent+'44');
+    // 泡泡本體
+    const br=S*.048;
+    drawBubble(ctx,bx,by,br,th.accent+'1A',th.accent+'60');
+    drawBubble(ctx,bx,by,br*.62,th.accent+'15',th.accent+'38');
 
     // 符號
     if(opts.icons){
       ctx.save();
-      ctx.font=`500 ${20}px serif`;
+      ctx.font=`400 ${19}px serif`;
       ctx.fillStyle=th.accent;ctx.textAlign='center';
       ctx.fillText(ing.symbolChar||'◈',bx,by+S*.007);
       ctx.restore();
     }
 
-    // 文字（外側方向）
+    // ── 文字：根據位置決定方向
+    // 上方 → 文字往上；下方 → 文字往下；左 → 左對齊；右 → 右對齊
+    const isTop=by<prodCY-S*.08;
+    const isBot=by>prodCY+S*.08;
+    const isLeft=bx<prodCX-S*.08;
+    const isRight=bx>prodCX+S*.08;
+
+    let tx=bx, ty=by;
+    let align='center';
+    const gap=br+S*.016;
+
+    if(isTop){ty=by-gap-S*.048;align='center';}
+    else if(isBot){ty=by+gap+S*.01;align='center';}
+    else if(isLeft){tx=bx-gap-S*.005;ty=by-S*.012;align='right';}
+    else if(isRight){tx=bx+gap+S*.005;ty=by-S*.012;align='left';}
+
     ctx.save();
-    const tx=bx+(bx-S*.5)*0.38;
-    const ty=by+(by-S*.5)*0.38;
-    ctx.textAlign=bx<S*.5?'right':'left';
-    ctx.font=`500 ${16}px 'Noto Serif TC',serif`;
+    ctx.textAlign=align;
+
+    // 名稱
+    ctx.font=`600 ${17}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.textDark;
-    ctx.fillText(ing.name,tx,ty-S*.008);
+    ctx.fillText(ing.name,tx,ty);
+
+    // 功效
     ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
     ctx.fillStyle=th.textMid;
-    ctx.fillText(ing.benefit||'',tx,ty+S*.014);
+    ctx.fillText(ing.benefit||'',tx,ty+S*.024);
     ctx.restore();
   });
 
-  // ── 中心光點（產品前方）
-  ctx.save();
-  const cg=ctx.createRadialGradient(S*.5,S*.5,0,S*.5,S*.5,S*.12);
-  cg.addColorStop(0,'rgba(255,255,255,0.15)');cg.addColorStop(1,'transparent');
-  ctx.fillStyle=cg;ctx.fillRect(0,0,S,S);
-  ctx.restore();
+  // ── 底部規格 / 品牌
+  if(opts.specbar&&a.spec){
+    ctx.save();
+    ctx.fillStyle=th.cardBg;
+    rr(ctx,S*.15,S*.895,S*.7,S*.052,10);ctx.fill();
+    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.7;
+    rr(ctx,S*.15,S*.895,S*.7,S*.052,10);ctx.stroke();
+    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    ctx.fillStyle=th.textMid;ctx.textAlign='center';
+    ctx.fillText('規格：'+a.spec,S*.5,S*.928);
+    ctx.restore();
+  }
 
   drawBrand(ctx,th);
   drawBorder(ctx,th.accent+'33');
