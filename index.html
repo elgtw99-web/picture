@@ -1051,96 +1051,240 @@ async function drawImg1(src,a,style,opts){
 }
 
 // ═══════════════════════════════════════════════════════
-// IMAGE 2 ── 成分圍繞圖（重構版）
-// 產品居中偏下，六成分固定六角位，文字往外展開
-// 每個成分有圓泡+符號+名稱+功效，連線清晰不重疊
+// IMAGE 2 ── 成分圍繞圖 v3
+// 產品居中，六成分六角位，軌道下移避開標題
+// 每個成分泡泡內有 Canvas 手繪插圖
 // ═══════════════════════════════════════════════════════
+
+// ── 成分插圖繪製器：根據成分名畫對應圖案
+function drawIngIcon(ctx, x, y, r, name, accentCol){
+  ctx.save();
+  ctx.translate(x, y);
+  const n = name||'';
+
+  // 水分/玻尿酸/保濕 → 水滴
+  if(/水|玻尿|保濕|濕|津|露/.test(n)){
+    ctx.fillStyle = accentCol+'CC';
+    ctx.beginPath();
+    ctx.moveTo(0,-r*.6);
+    ctx.bezierCurveTo(r*.5,-r*.1, r*.5,r*.4, 0,r*.6);
+    ctx.bezierCurveTo(-r*.5,r*.4, -r*.5,-r*.1, 0,-r*.6);
+    ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.beginPath();ctx.ellipse(-r*.15,-r*.15,r*.1,r*.18,-0.5,0,Math.PI*2);ctx.fill();
+  }
+  // 膠原蛋白/蛋白/胜肽 → 螺旋鏈
+  else if(/膠原|蛋白|胜肽|肽|胺/.test(n)){
+    ctx.strokeStyle=accentCol+'DD';ctx.lineWidth=r*.12;ctx.lineCap='round';
+    for(let i=0;i<3;i++){
+      ctx.beginPath();
+      ctx.arc(0,0,r*(0.28+i*.14),(i*.6-1.2),(i*.6+.8));
+      ctx.stroke();
+    }
+    for(let i=0;i<6;i++){
+      const a2=i/6*Math.PI*2, rr2=r*.42;
+      ctx.fillStyle=accentCol;
+      ctx.beginPath();ctx.arc(Math.cos(a2)*rr2,Math.sin(a2)*rr2,r*.07,0,Math.PI*2);ctx.fill();
+    }
+  }
+  // 黃金/金/24K → 六角形
+  else if(/黃金|金|24K|Au/.test(n)){
+    ctx.fillStyle=accentCol+'BB';
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a2=i/6*Math.PI*2-Math.PI/6;
+      i===0?ctx.moveTo(Math.cos(a2)*r*.55,Math.sin(a2)*r*.55):ctx.lineTo(Math.cos(a2)*r*.55,Math.sin(a2)*r*.55);
+    }
+    ctx.closePath();ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.3)';
+    ctx.beginPath();
+    for(let i=0;i<6;i++){
+      const a2=i/6*Math.PI*2-Math.PI/6;
+      i===0?ctx.moveTo(Math.cos(a2)*r*.3,Math.sin(a2)*r*.3):ctx.lineTo(Math.cos(a2)*r*.3,Math.sin(a2)*r*.3);
+    }
+    ctx.closePath();ctx.fill();
+  }
+  // 竹炭/炭/碳/活性炭 → 竹節
+  else if(/竹|炭|碳/.test(n)){
+    ctx.fillStyle=accentCol+'99';
+    ctx.strokeStyle=accentCol+'CC';ctx.lineWidth=r*.08;
+    [-r*.28,0,r*.28].forEach((yy,i)=>{
+      const w=r*(i===1?.38:.3);
+      rr_local(ctx,-w/2,yy-r*.14,w,r*.28,r*.06);
+      ctx.fill();ctx.stroke();
+    });
+    ctx.strokeStyle=accentCol+'55';ctx.lineWidth=r*.05;
+    ctx.beginPath();ctx.moveTo(0,-r*.6);ctx.lineTo(0,r*.6);ctx.stroke();
+  }
+  // 玫瑰/薔薇/花/牡丹 → 玫瑰花
+  else if(/玫瑰|薔薇|花|牡丹|菊|芍藥/.test(n)){
+    for(let p=0;p<5;p++){
+      const pa=p/5*Math.PI*2;
+      ctx.fillStyle=accentCol+(p%2===0?'BB':'88');
+      ctx.beginPath();
+      ctx.ellipse(Math.cos(pa)*r*.28,Math.sin(pa)*r*.28,r*.22,r*.15,pa,0,Math.PI*2);
+      ctx.fill();
+    }
+    ctx.fillStyle=accentCol+'EE';
+    ctx.beginPath();ctx.arc(0,0,r*.18,0,Math.PI*2);ctx.fill();
+  }
+  // 藻/海藻/褐藻 → 海草波浪
+  else if(/藻|海草|珊瑚|海/.test(n)){
+    ctx.strokeStyle=accentCol+'CC';ctx.lineWidth=r*.1;ctx.lineCap='round';
+    [-r*.22,0,r*.22].forEach((xx,i)=>{
+      ctx.beginPath();
+      ctx.moveTo(xx,r*.5);
+      ctx.bezierCurveTo(xx+r*.2,r*.2,xx-r*.2,-r*.1,xx+r*.15,-r*.4);
+      ctx.bezierCurveTo(xx+r*.35,-r*.55,xx+r*.1,-r*.62,xx,-r*.5);
+      ctx.stroke();
+    });
+  }
+  // 維他命/維生素/VC/VE → 圓形藥丸
+  else if(/維他命|維生素|VC|VE|VA|菸鹼|菸酸/.test(n)){
+    ctx.fillStyle=accentCol+'AA';
+    ctx.beginPath();ctx.ellipse(0,0,r*.55,r*.35,-.3,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.25)';
+    ctx.beginPath();ctx.ellipse(-r*.1,-r*.08,r*.22,r*.14,-.3,0,Math.PI);ctx.fill();
+    ctx.strokeStyle=accentCol+'EE';ctx.lineWidth=r*.07;
+    ctx.beginPath();ctx.moveTo(-r*.55*Math.cos(.3),r*.35*Math.sin(.3));
+    ctx.lineTo(r*.55*Math.cos(.3),-r*.35*Math.sin(.3));ctx.stroke();
+  }
+  // 甘草/草本/植物萃取/萃取 → 葉片
+  else if(/草|植物|萃取|葉|綠|茶|蘆薈|薑/.test(n)){
+    ctx.fillStyle=accentCol+'AA';
+    ctx.beginPath();
+    ctx.moveTo(0,r*.55);
+    ctx.bezierCurveTo(r*.45,r*.2,r*.45,-r*.3,0,-r*.55);
+    ctx.bezierCurveTo(-r*.45,-r*.3,-r*.45,r*.2,0,r*.55);
+    ctx.fill();
+    ctx.strokeStyle='rgba(255,255,255,0.3)';ctx.lineWidth=r*.05;
+    ctx.beginPath();ctx.moveTo(0,r*.5);ctx.lineTo(0,-r*.5);ctx.stroke();
+    for(let i=1;i<4;i++){
+      const fy=r*(.35-i*.25);
+      ctx.beginPath();ctx.moveTo(0,fy);ctx.lineTo(r*.28,fy-r*.1);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(0,fy);ctx.lineTo(-r*.28,fy-r*.1);ctx.stroke();
+    }
+  }
+  // 珍珠/白皙/亮白/煙酸 → 珍珠圓
+  else if(/珍珠|白皙|亮白|美白|亮/.test(n)){
+    const pgrd=ctx.createRadialGradient(-r*.18,-r*.18,0,0,0,r*.5);
+    pgrd.addColorStop(0,'rgba(255,255,255,0.95)');
+    pgrd.addColorStop(.5,accentCol+'99');
+    pgrd.addColorStop(1,accentCol+'55');
+    ctx.fillStyle=pgrd;
+    ctx.beginPath();ctx.arc(0,0,r*.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.5)';
+    ctx.beginPath();ctx.ellipse(-r*.18,-r*.18,r*.12,r*.08,-.8,0,Math.PI*2);ctx.fill();
+  }
+  // 預設 → 晶球（通用）
+  else {
+    const dgrd=ctx.createRadialGradient(-r*.2,-r*.2,0,0,0,r*.5);
+    dgrd.addColorStop(0,'rgba(255,255,255,0.6)');
+    dgrd.addColorStop(.6,accentCol+'88');
+    dgrd.addColorStop(1,accentCol+'44');
+    ctx.fillStyle=dgrd;
+    ctx.beginPath();ctx.arc(0,0,r*.5,0,Math.PI*2);ctx.fill();
+    ctx.fillStyle='rgba(255,255,255,0.35)';
+    ctx.beginPath();ctx.ellipse(-r*.15,-r*.15,r*.12,r*.08,-.5,0,Math.PI*2);ctx.fill();
+  }
+  ctx.restore();
+}
+
+function rr_local(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
 async function drawImg2(src,a,style,opts){
   const c=mk(),ctx=c.getContext('2d'),th=THEMES[style];
   const img=await loadImg(src);
   const ings=(a.ingredients||[]).slice(0,6);
   const S=SZ;
 
-  // ── 背景
   th.bg(ctx,S);
 
-  // 中心柔光
-  const cg=ctx.createRadialGradient(S*.5,S*.52,0,S*.5,S*.52,S*.45);
-  cg.addColorStop(0,th.accent+'15');cg.addColorStop(1,'transparent');
-  ctx.fillStyle=cg;ctx.fillRect(0,0,S,S);
+  // 背景柔光
+  [[S*.5,S*.56,S*.38],[S*.15,S*.85,S*.22],[S*.85,S*.25,S*.2]].forEach(([gx,gy,gr])=>{
+    const g=ctx.createRadialGradient(gx,gy,0,gx,gy,gr);
+    g.addColorStop(0,th.accent+'12');g.addColorStop(1,'transparent');
+    ctx.fillStyle=g;ctx.fillRect(0,0,S,S);
+  });
 
   if(opts.particles){
     ctx.save();
-    for(let i=0;i<30;i++){
-      ctx.fillStyle=th.accent+'18';
-      ctx.beginPath();ctx.arc(Math.random()*S,Math.random()*S,.8+Math.random()*2,0,Math.PI*2);ctx.fill();
+    for(let i=0;i<28;i++){
+      ctx.fillStyle=th.accent+'15';
+      ctx.beginPath();ctx.arc(Math.random()*S,Math.random()*S,.6+Math.random()*2,0,Math.PI*2);ctx.fill();
     }
     ctx.restore();
   }
 
-  // ── 標題區（頂部）
+  // ── 標題區（頂部，留足空間）
   ctx.save();ctx.textAlign='center';
-  ctx.font=`700 ${28}px 'Noto Serif TC',serif`;
+  ctx.font=`700 ${26}px 'Noto Serif TC',serif`;
   ctx.fillStyle=th.textDark;
-  ctx.fillText('【'+(a.productName||'')+'】成分解析',S*.5,S*.085);
+  ctx.fillText('【'+(a.productName||'')+'】成分解析',S*.5,S*.082);
   if(opts.tagline){
-    ctx.font=`300 ${16}px 'Noto Serif TC',serif`;
+    ctx.font=`300 ${15}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.accent;
-    ctx.fillText(a.tagline||'',S*.5,S*.118);
+    ctx.fillText(a.tagline||'',S*.5,S*.113);
   }
   ctx.restore();
-  // 裝飾線
-  ornLine(ctx,S*.18,S*.138,S*.82,S*.138,th.accent+'44');
+  ornLine(ctx,S*.2,S*.132,S*.8,S*.132,th.accent+'44');
 
-  // ── 產品居中
-  const prodCX=S*.5, prodCY=S*.52;
+  // ── 產品居中（稍偏下，讓上方成分不卡標題）
+  const prodCX=S*.5, prodCY=S*.565;
+
   // 產品背後光暈
-  const pg=ctx.createRadialGradient(prodCX,prodCY,0,prodCX,prodCY,S*.18);
-  pg.addColorStop(0,'rgba(255,255,255,0.18)');pg.addColorStop(1,'transparent');
+  const pg=ctx.createRadialGradient(prodCX,prodCY,0,prodCX,prodCY,S*.17);
+  pg.addColorStop(0,'rgba(255,255,255,0.16)');pg.addColorStop(1,'transparent');
   ctx.fillStyle=pg;ctx.fillRect(0,0,S,S);
 
-  fitProd(ctx,img,prodCX,prodCY,S*.28,S*.28);
+  fitProd(ctx,img,prodCX,prodCY,S*.26,S*.26);
 
-  // ── 六成分：六角形固定位置
-  // 上中、右上、右下、下中、左下、左上
-  const N=ings.length;
-  // 六個固定角度（從頂部順時針）
-  const angles=[
-    -Math.PI/2,           // 正上
-    -Math.PI/2+Math.PI/3, // 右上
-    -Math.PI/2+2*Math.PI/3,// 右下
-    Math.PI/2,            // 正下
-    -Math.PI/2-2*Math.PI/3,// 左下
-    -Math.PI/2-Math.PI/3, // 左上
-  ];
+  // ── 六成分軌道（橢圓，縮小且整體下移）
+  // 軌道中心跟產品中心同步下移
+  const RX=S*.3, RY=S*.27;
 
-  // 軌道半徑（橢圓，水平稍寬）
-  const RX=S*.33, RY=S*.29;
-
-  // 先畫軌道圓（裝飾）
+  // 軌道虛線
   ctx.save();
-  ctx.strokeStyle=th.accent+'20';ctx.lineWidth=1;
-  ctx.setLineDash([5,7]);
+  ctx.strokeStyle=th.accent+'1E';ctx.lineWidth=1;
+  ctx.setLineDash([5,8]);
   ctx.beginPath();ctx.ellipse(prodCX,prodCY,RX,RY,0,0,Math.PI*2);ctx.stroke();
   ctx.setLineDash([]);
-  ctx.strokeStyle=th.accent+'0E';ctx.lineWidth=.5;
-  ctx.beginPath();ctx.ellipse(prodCX,prodCY,RX*1.08,RY*1.08,0,0,Math.PI*2);ctx.stroke();
+  ctx.strokeStyle=th.accent+'0A';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.ellipse(prodCX,prodCY,RX*1.06,RY*1.06,0,0,Math.PI*2);ctx.stroke();
   ctx.restore();
 
+  // 六個角度（從右上順時針，避免正上方緊貼標題）
+  const angles=[
+    -Math.PI/2 + Math.PI/6,   // 右上 (~60°)
+    Math.PI/6,                 // 右  (~30° from right)
+    Math.PI/2 + Math.PI/6,    // 右下
+    Math.PI/2 + Math.PI*5/6,  // 左下
+    -Math.PI + Math.PI/6,     // 左
+    -Math.PI/2 - Math.PI/6,   // 左上
+  ];
+
+  const N=ings.length;
   ings.forEach((ing,i)=>{
-    const angle=angles[i]||((i/N)*Math.PI*2-Math.PI/2);
+    const angle=i<angles.length?angles[i]:((i/N)*Math.PI*2-Math.PI/2);
     const bx=prodCX+RX*Math.cos(angle);
     const by=prodCY+RY*Math.sin(angle);
 
-    // 連線（產品中心 → 泡泡）
+    // 連線
     if(opts.radial){
       ctx.save();
       const gl=ctx.createLinearGradient(prodCX,prodCY,bx,by);
       gl.addColorStop(0,'transparent');
-      gl.addColorStop(.5,th.accent+'28');
-      gl.addColorStop(1,th.accent+'55');
-      ctx.strokeStyle=gl;ctx.lineWidth=1;
-      ctx.setLineDash([4,6]);
+      gl.addColorStop(.45,th.accent+'20');
+      gl.addColorStop(1,th.accent+'50');
+      ctx.strokeStyle=gl;ctx.lineWidth=.9;
+      ctx.setLineDash([3,6]);
       ctx.beginPath();ctx.moveTo(prodCX,prodCY);ctx.lineTo(bx,by);ctx.stroke();
       ctx.setLineDash([]);
       ctx.restore();
@@ -1148,66 +1292,69 @@ async function drawImg2(src,a,style,opts){
 
     // 泡泡光暈
     ctx.save();
-    const hg=ctx.createRadialGradient(bx,by,0,bx,by,S*.065);
-    hg.addColorStop(0,th.accent+'22');hg.addColorStop(1,'transparent');
+    const hg=ctx.createRadialGradient(bx,by,0,bx,by,S*.07);
+    hg.addColorStop(0,th.accent+'1E');hg.addColorStop(1,'transparent');
     ctx.fillStyle=hg;ctx.fillRect(0,0,S,S);
     ctx.restore();
 
     // 泡泡本體
-    const br=S*.048;
-    drawBubble(ctx,bx,by,br,th.accent+'1A',th.accent+'60');
-    drawBubble(ctx,bx,by,br*.62,th.accent+'15',th.accent+'38');
+    const br=S*.052;
+    drawBubble(ctx,bx,by,br,th.accent+'18',th.accent+'55');
+    drawBubble(ctx,bx,by,br*.7,th.accent+'12',th.accent+'30');
 
-    // 符號
-    if(opts.icons){
-      ctx.save();
-      ctx.font=`400 ${19}px serif`;
-      ctx.fillStyle=th.accent;ctx.textAlign='center';
-      ctx.fillText(ing.symbolChar||'◈',bx,by+S*.007);
-      ctx.restore();
-    }
+    // ── 成分插圖（取代文字符號）
+    drawIngIcon(ctx,bx,by,br,ing.name,th.accent);
 
-    // ── 文字：根據位置決定方向
-    // 上方 → 文字往上；下方 → 文字往下；左 → 左對齊；右 → 右對齊
-    const isTop=by<prodCY-S*.08;
-    const isBot=by>prodCY+S*.08;
-    const isLeft=bx<prodCX-S*.08;
-    const isRight=bx>prodCX+S*.08;
+    // ── 文字標籤：根據位置放到泡泡外側
+    const toCenter={x:prodCX-bx,y:prodCY-by};
+    const dist=Math.sqrt(toCenter.x**2+toCenter.y**2);
+    const outDir={x:-toCenter.x/dist, y:-toCenter.y/dist};
+    const gap=br+S*.018;
+    const tx=bx+outDir.x*gap;
+    const ty=by+outDir.y*gap;
 
-    let tx=bx, ty=by;
+    // 決定文字對齊方向
+    const isMoreHoriz=Math.abs(outDir.x)>Math.abs(outDir.y);
     let align='center';
-    const gap=br+S*.016;
+    if(isMoreHoriz) align=outDir.x>0?'left':'right';
 
-    if(isTop){ty=by-gap-S*.048;align='center';}
-    else if(isBot){ty=by+gap+S*.01;align='center';}
-    else if(isLeft){tx=bx-gap-S*.005;ty=by-S*.012;align='right';}
-    else if(isRight){tx=bx+gap+S*.005;ty=by-S*.012;align='left';}
-
+    // 文字背板（半透明圓角框）
     ctx.save();
-    ctx.textAlign=align;
+    ctx.font=`600 ${15}px 'Noto Serif TC',serif`;
+    const nm=ing.name||'';
+    const nmW=ctx.measureText(nm).width;
+    const lbW=nmW+S*.024, lbH=S*.056;
+    const lbX=align==='center'?tx-lbW/2:align==='left'?tx:tx-lbW;
+    const lbY=ty-S*.018;
+    ctx.fillStyle=th.cardBg||'rgba(255,255,255,0.65)';
+    rr(ctx,lbX,lbY,lbW,lbH,8);ctx.fill();
+    ctx.strokeStyle=th.accent+'33';ctx.lineWidth=.7;
+    rr(ctx,lbX,lbY,lbW,lbH,8);ctx.stroke();
+    ctx.restore();
 
     // 名稱
-    ctx.font=`600 ${17}px 'Noto Serif TC',serif`;
+    ctx.save();
+    ctx.textAlign=align;
+    ctx.font=`600 ${15}px 'Noto Serif TC',serif`;
     ctx.fillStyle=th.textDark;
-    ctx.fillText(ing.name,tx,ty);
-
+    ctx.fillText(nm,tx,ty+S*.004);
     // 功效
-    ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
+    ctx.font=`300 ${11}px 'Noto Sans TC',sans-serif`;
     ctx.fillStyle=th.textMid;
-    ctx.fillText(ing.benefit||'',tx,ty+S*.024);
+    ctx.fillText(ing.benefit||'',tx,ty+S*.023);
     ctx.restore();
   });
 
-  // ── 底部規格 / 品牌
+  // ── 規格欄
   if(opts.specbar&&a.spec){
     ctx.save();
     ctx.fillStyle=th.cardBg;
-    rr(ctx,S*.15,S*.895,S*.7,S*.052,10);ctx.fill();
-    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.7;
-    rr(ctx,S*.15,S*.895,S*.7,S*.052,10);ctx.stroke();
-    ctx.font=`300 ${13}px 'Noto Sans TC',sans-serif`;
+    rr(ctx,S*.18,S*.918,S*.64,S*.048,10);ctx.fill();
+    ctx.strokeStyle=th.cardStroke;ctx.lineWidth=.6;
+    rr(ctx,S*.18,S*.918,S*.64,S*.048,10);ctx.stroke();
+    ctx.font=`300 ${12}px 'Noto Sans TC',sans-serif`;
     ctx.fillStyle=th.textMid;ctx.textAlign='center';
-    ctx.fillText('規格：'+a.spec,S*.5,S*.928);
+    ctx.fillText('規格：'+a.spec,S*.5,S*.948);
     ctx.restore();
   }
 
