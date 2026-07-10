@@ -273,9 +273,24 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
     <textarea id="ttxt" style="min-height:55px" placeholder="例：30-45歲熟齡女性，抗老保濕…"></textarea>
   </div>
 
+  <!-- PLATFORM / SIZE -->
+  <div class="sec">
+    <div class="sec-lbl">06 · 投放平台 / 尺寸</div>
+    <div class="toggle-row" id="platRow">
+      <div class="tog on" data-plat="shopee" onclick="pickPlat(this)">🛒 蝦皮主圖 1:1</div>
+      <div class="tog" data-plat="ig" onclick="pickPlat(this)">📸 IG 貼文 4:5</div>
+      <div class="tog" data-plat="story" onclick="pickPlat(this)">📱 限動 9:16</div>
+      <div class="tog" data-plat="web" onclick="pickPlat(this)">🖥 官網 Banner 16:9</div>
+      <div class="tog" data-plat="square" onclick="pickPlat(this)">⬜ 通用方形 1:1</div>
+    </div>
+    <div style="margin-top:.5rem;font-size:.6rem;color:rgba(168,144,112,.5);line-height:1.6">
+      決定出圖比例與版面重點；提示詞會依平台自動調整。
+    </div>
+  </div>
+
   <!-- API KEY -->
   <div class="sec">
-    <div class="sec-lbl">06 · Anthropic API Key</div>
+    <div class="sec-lbl">07 · Anthropic API Key（分析 / 寫提示詞）</div>
     <div style="position:relative">
       <input type="password" id="apiKey" placeholder="sk-ant-api03-…" autocomplete="off"
         style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-family:'Noto Sans TC',sans-serif;font-size:.74rem;padding:.75rem 2.6rem .75rem .8rem;outline:none;transition:border-color .2s"
@@ -291,8 +306,30 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
     <div id="keyStatus" style="margin-top:.4rem;font-size:.62rem;display:none"></div>
   </div>
 
-  <button class="btn" id="genBtn" onclick="doGen()">
-    <span id="btnTxt">✦ 生成四張展示圖</span>
+  <!-- OPENAI KEY (optional, for auto image gen) -->
+  <div class="sec">
+    <div class="sec-lbl">08 · OpenAI API Key（選填 · 自動出圖）</div>
+    <div style="position:relative">
+      <input type="password" id="oaiKey" placeholder="sk-…（留空則只產生提示詞）" autocomplete="off"
+        style="width:100%;background:rgba(255,255,255,.04);border:1px solid rgba(196,153,42,.16);border-radius:8px;color:#FAF8F2;font-family:'Noto Sans TC',sans-serif;font-size:.74rem;padding:.75rem 2.6rem .75rem .8rem;outline:none;transition:border-color .2s"
+        oninput="saveOaiKey(this.value)"
+        onfocus="this.style.borderColor='var(--g1)'"
+        onblur="this.style.borderColor='rgba(196,153,42,.16)'">
+      <span id="oaiEyeBtn" onclick="toggleOai()" style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);cursor:pointer;font-size:.8rem;color:var(--light);user-select:none">👁</span>
+    </div>
+    <div style="margin-top:.55rem;font-size:.6rem;color:rgba(168,144,112,.5);line-height:1.6">
+      填入後可用 gpt-image-1 直接自動出圖（按張計費）；不填則產生提示詞，貼到 ChatGPT / Sora 手動出圖。
+    </div>
+    <div id="oaiStatus" style="margin-top:.4rem;font-size:.62rem;display:none"></div>
+  </div>
+
+  <button class="btn" id="promptBtn" onclick="doPrompts()">
+    <span id="promptTxt">✦ 產生 AI 出圖提示詞</span>
+    <div class="spin" id="sp2"></div>
+  </button>
+
+  <button class="btn" id="genBtn" onclick="doGen()" style="margin-top:.6rem;background:transparent;border:1px solid rgba(196,153,42,.3);color:var(--g2)">
+    <span id="btnTxt">⚡ 快速預覽（Canvas 版四張圖）</span>
     <div class="spin" id="sp"></div>
   </button>
 
@@ -321,12 +358,36 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 // ─── STATE ───
 let prodImg=null, origProdImg=null, labelImg=null, aiData=null;
 let curStyle='marble';
+let curPlat='shopee';
 let opts={icons:true,radial:true,deco:true,particles:true,tagline:true,specbar:false,darkprod:false};
+
+// ─── 風格 → 出圖視覺描述（給圖像模型的風格基調）───
+const STYLE_DESC={
+  marble:'米白大理石紋理背景，暖金色點綴與細緻金線，柔和自然光，高端奢華電商質感',
+  ink:'深墨藍背景搭配金箔潑墨與東方水墨暈染，留白雅致，文人高雅氛圍',
+  rose:'粉霧玫瑰色調，柔金線條與花瓣光影，浪漫細膩，女性美妝雜誌質感',
+  botanical:'淡綠草本背景，新鮮葉脈、植物與水珠，清新自然光，天然有機保養氛圍',
+  noir:'純黑背景搭配炫金幾何線條與聚光燈打光，頂級精品珠寶般的高級奢華感',
+  mist:'霧藍漸層背景，柔和光暈與空氣中的光粒子，輕盈夢幻，清透療癒氛圍'
+};
+// ─── 平台 → 比例 / 版面重點 ───
+const PLATFORMS={
+  shopee:{label:'蝦皮電商主圖', ratio:'1:1', size:'1024x1024', layout:'正方形置中構圖，產品佔畫面主體約 60%，留白乾淨、賣點文字精簡，適合縮圖點閱'},
+  ig:{label:'IG 貼文', ratio:'4:5', size:'1024x1280', layout:'直式 4:5 構圖，情境氛圍濃、視覺吸睛，適合社群動態瀏覽'},
+  story:{label:'IG/FB 限動', ratio:'9:16', size:'1024x1792', layout:'全屏直式 9:16 構圖，上下留出文字安全區，沉浸式滿版視覺'},
+  web:{label:'官網 Banner', ratio:'16:9', size:'1792x1024', layout:'橫式 16:9 構圖，產品偏一側、另一側留白放標題，大器橫幅視覺'},
+  square:{label:'通用方形', ratio:'1:1', size:'1024x1024', layout:'正方形置中構圖，通用於多平台'}
+};
 
 function pickStyle(el){
   document.querySelectorAll('.style-card').forEach(c=>c.classList.remove('selected'));
   el.classList.add('selected');
   curStyle=el.dataset.style;
+}
+function pickPlat(el){
+  document.querySelectorAll('#platRow .tog').forEach(c=>c.classList.remove('on'));
+  el.classList.add('on');
+  curPlat=el.dataset.plat;
 }
 function togOpt(el){
   el.classList.toggle('on');
@@ -604,6 +665,8 @@ window.addEventListener('DOMContentLoaded',()=>{
     if(saved){document.getElementById('apiKey').value=saved;saveKey(saved);}
     const rmbg=localStorage.getItem('yilojia_rmbgkey');
     if(rmbg){document.getElementById('rmbgKey').value=rmbg;saveRmbgKey(rmbg);}
+    const oai=localStorage.getItem('yilojia_oaikey');
+    if(oai){document.getElementById('oaiKey').value=oai;saveOaiKey(oai);}
   }catch(e){}
 });
 
@@ -611,9 +674,16 @@ window.addEventListener('DOMContentLoaded',()=>{
 async function analyze(ltxt,ttxt,limg){
   const uc=[];
   if(limg){const b64=limg.split(',')[1],mime=limg.split(';')[0].split(':')[1];uc.push({type:'image',source:{type:'base64',media_type:mime,data:b64}});}
-  uc.push({type:'text',text:`你是頂級化妝品行銷顧問。純JSON回應，無markdown：
+  const styleDesc=STYLE_DESC[curStyle]||STYLE_DESC.marble;
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  uc.push({type:'text',text:`你是頂級化妝品行銷與商業攝影指導。純JSON回應，無markdown：
 產品說明：${ltxt||'見圖'}
-目標：${ttxt||'一般女性'}
+目標客群：${ttxt||'一般女性'}
+選定視覺風格：${styleDesc}
+投放平台：${plat.label}（比例 ${plat.ratio}，${plat.layout}）
+
+請輸出以下 JSON。其中 imagePrompts 為四段「商業出圖場景指導」，將由圖像模型（gpt-image-1 / ChatGPT）搭配一張『已去背的真實產品照』生成。
+規則：產品本體（外觀、包裝、標籤、文字）必須完整保留、不可更改或重繪，你只描述『產品周圍的場景、背景、道具、光線、構圖、氛圍』。四段須分別對應四種行銷用途，並針對上述風格、平台比例、客群量身設計。scene 用生動具體的中文，60-110字，可帶入賣點/成分/情境，但不要出現產品名或標籤文字內容。
 
 {
   "productName":"名稱",
@@ -629,6 +699,12 @@ async function analyze(ltxt,ttxt,limg){
     {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"},
     {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"},
     {"title":"痛點標題5字內","desc":"困擾描述12字內","scene":"使用場景6字內","icon":"eye|water|dark|wrinkle|pore|tired|sun|glow|firm|clean"}
+  ],
+  "imagePrompts":[
+    {"purpose":"白底電商主圖","focus":"乾淨呈現產品、突顯質感","scene":"..."},
+    {"purpose":"成分賣點情境圖","focus":"以核心成分/賣點布置場景","scene":"..."},
+    {"purpose":"質感深度圖","focus":"特寫紋理、專業高級感","scene":"..."},
+    {"purpose":"夢境使用情境圖","focus":"引發嚮往的生活情境","scene":"..."}
   ]
 }`});
   const key=getKey();
@@ -660,6 +736,155 @@ function showResults(items){
 function dl(btn,name){
   const c=btn.closest('.ic').querySelector('canvas');
   const a=document.createElement('a');a.download=name+'.png';a.href=c.toDataURL('image/png');a.click();
+}
+
+// ─── AI 出圖提示詞（主要新功能）───
+function buildFinalPrompt(ip){
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  const styleDesc=STYLE_DESC[curStyle]||STYLE_DESC.marble;
+  return `【用途】${ip.purpose}｜${ip.focus||''}
+【平台 / 尺寸】${plat.label}　比例 ${plat.ratio}（${plat.size}）
+
+請以我附上的產品照片為主角，完整保留產品的外觀、包裝、標籤與文字，不要更改、變形或重繪產品本體。將產品自然地融入以下場景：
+
+${ip.scene}
+
+整體視覺風格：${styleDesc}。
+輸出為 ${plat.ratio} 高解析度商業行銷展示圖，光影真實、產品與場景邊緣自然融合，畫質精緻，不要加上多餘的浮水印或雜亂文字。`;
+}
+
+async function doPrompts(){
+  if(!prodImg){alert('請先上傳產品照片');return;}
+  const ltxt=document.getElementById('ltxt').value.trim();
+  const ttxt=document.getElementById('ttxt').value.trim();
+  if(!ltxt&&!labelImg){alert('請上傳標籤或輸入成分說明');return;}
+
+  const btn=document.getElementById('promptBtn');
+  btn.disabled=true;
+  document.getElementById('promptTxt').style.display='none';
+  document.getElementById('sp2').style.display='block';
+  document.getElementById('emp').style.display='none';
+  document.getElementById('pw').style.display='block';
+  document.getElementById('rg').style.display='none';
+  document.getElementById('ana').style.display='none';
+
+  try{
+    prog(1,50,'AI 解析賣點並撰寫針對性出圖提示詞…');
+    aiData=await analyze(ltxt,ttxt,labelImg);
+    prog(1,100,'✓ 完成');
+    showAna(aiData);
+    renderPrompts(aiData);
+  }catch(err){
+    console.error(err);alert('產生失敗：'+err.message);
+  }
+  btn.disabled=false;
+  document.getElementById('promptTxt').style.display='block';
+  document.getElementById('sp2').style.display='none';
+}
+
+function renderPrompts(a){
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  const ips=(a.imagePrompts&&a.imagePrompts.length)?a.imagePrompts:[
+    {purpose:'白底電商主圖',focus:'乾淨呈現產品',scene:'簡潔柔和的背景，柔光打亮產品，突顯質感與色澤。'},
+    {purpose:'成分賣點情境圖',focus:'突顯核心成分',scene:'圍繞產品擺放相關天然成分與素材，呈現配方訴求。'},
+    {purpose:'質感深度圖',focus:'專業高級感',scene:'特寫質地與細節，光影層次分明，營造專業信任感。'},
+    {purpose:'夢境使用情境圖',focus:'生活嚮往',scene:'柔美生活情境，暖光氛圍，引發使用後的美好想像。'}
+  ];
+  const hasOai=!!getOaiKey();
+  const g=document.getElementById('rg');
+  g.innerHTML=`
+    <div style="grid-column:1/-1;background:rgba(196,153,42,.08);border:1px solid rgba(196,153,42,.25);border-radius:10px;padding:.9rem 1rem;margin-bottom:.4rem;font-size:.72rem;line-height:1.7;color:#EBE3D2">
+      <b style="color:var(--g1)">📌 使用方式</b>　${hasOai?'已偵測 OpenAI Key，可直接按「自動出圖」。':'複製下方提示詞 → 到 ChatGPT / Sora → 先上傳「去背後的產品照」→ 貼上提示詞送出。'}
+      <div style="margin-top:.5rem">
+        <button onclick="dlProd()" style="background:rgba(255,255,255,.06);border:1px solid rgba(196,153,42,.3);color:var(--g2);border-radius:6px;padding:.4rem .7rem;font-size:.66rem;cursor:pointer">⬇ 下載去背產品照（拿去附加）</button>
+        <button onclick="copyAll()" style="background:rgba(255,255,255,.06);border:1px solid rgba(196,153,42,.3);color:var(--g2);border-radius:6px;padding:.4rem .7rem;font-size:.66rem;cursor:pointer;margin-left:.4rem">📋 複製全部四段</button>
+        <span style="color:rgba(168,144,112,.7);margin-left:.5rem">目前平台：${plat.label}　${plat.ratio}</span>
+      </div>
+    </div>`;
+  ips.slice(0,4).forEach((ip,i)=>{
+    const full=buildFinalPrompt(ip);
+    const card=document.createElement('div');
+    card.className='ic';
+    card.style.cssText='grid-column:1/-1';
+    card.innerHTML=`
+      <div class="ch">
+        <div><div class="cnum">0${i+1}</div><div class="cttl">${ip.purpose||''}</div></div>
+        <div style="display:flex;gap:.4rem">
+          <button class="dlb" onclick="copyPrompt(this)">📋 複製</button>
+          ${hasOai?`<button class="dlb" style="background:var(--g1);color:#1a1408" onclick="genOne(this,${i})">✦ 自動出圖</button>`:''}
+        </div>
+      </div>
+      <div style="font-size:.62rem;color:rgba(168,144,112,.75);margin:.2rem 0 .5rem">${ip.focus||''}</div>
+      <textarea readonly class="promptBox" style="width:100%;min-height:150px;background:rgba(0,0,0,.25);border:1px solid rgba(196,153,42,.18);border-radius:8px;color:#EBE3D2;font-family:'Noto Sans TC',sans-serif;font-size:.72rem;line-height:1.7;padding:.7rem;resize:vertical;outline:none">${full}</textarea>
+      <div class="oaiResult" style="margin-top:.6rem"></div>`;
+    g.appendChild(card);
+  });
+  g.style.display='grid';
+}
+function copyPrompt(btn){
+  const ta=btn.closest('.ic').querySelector('.promptBox');
+  navigator.clipboard.writeText(ta.value).then(()=>{const o=btn.textContent;btn.textContent='✓ 已複製';setTimeout(()=>btn.textContent=o,1400);});
+}
+function copyAll(){
+  const all=[...document.querySelectorAll('.promptBox')].map((t,i)=>`──── 第 ${i+1} 張 ────\n`+t.value).join('\n\n');
+  navigator.clipboard.writeText(all);
+}
+function dlProd(){
+  if(!prodImg)return;
+  const a=document.createElement('a');a.download='去背產品照.png';a.href=prodImg;a.click();
+}
+
+// ─── OpenAI 出圖串接（gpt-image-1）───
+function saveOaiKey(v){
+  try{localStorage.setItem('yilojia_oaikey',v);}catch(e){}
+  const s=document.getElementById('oaiStatus');
+  if(v.startsWith('sk-')){s.style.display='block';s.style.color='rgba(122,200,122,.8)';s.textContent='✓ 已儲存，可自動出圖';}
+  else if(v.length>0){s.style.display='block';s.style.color='rgba(200,100,100,.8)';s.textContent='⚠ 金鑰格式有誤';}
+  else{s.style.display='none';}
+}
+function getOaiKey(){
+  const f=document.getElementById('oaiKey').value.trim();
+  if(f)return f;
+  try{return localStorage.getItem('yilojia_oaikey')||'';}catch(e){return '';}
+}
+function toggleOai(){
+  const inp=document.getElementById('oaiKey');const btn=document.getElementById('oaiEyeBtn');
+  if(inp.type==='password'){inp.type='text';btn.textContent='🙈';}else{inp.type='password';btn.textContent='👁';}
+}
+function dataURLtoBlob(d){const[m,b]=d.split(',');const mime=m.split(':')[1].split(';')[0];const bin=atob(b);const u=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)u[i]=bin.charCodeAt(i);return new Blob([u],{type:mime});}
+async function genOne(btn,i){
+  const key=getOaiKey();
+  if(!key){alert('請先填入 OpenAI API Key');return;}
+  const card=btn.closest('.ic');
+  const prompt=card.querySelector('.promptBox').value;
+  const box=card.querySelector('.oaiResult');
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  btn.disabled=true;const o=btn.textContent;btn.textContent='出圖中…';
+  box.innerHTML='<span style="font-size:.66rem;color:rgba(168,144,112,.8)">gpt-image-1 生成中，約 15-40 秒…</span>';
+  try{
+    const url=await generateWithOpenAI(prompt,prodImg,key,plat.size);
+    box.innerHTML=`<img src="${url}" style="width:100%;border-radius:8px;border:1px solid rgba(196,153,42,.2)"><a download="依洛嘉_出圖0${i+1}.png" href="${url}" class="dlb" style="display:inline-block;margin-top:.5rem;text-decoration:none">下載 PNG</a>`;
+  }catch(err){
+    box.innerHTML=`<span style="font-size:.66rem;color:rgba(220,120,120,.9)">出圖失敗：${err.message}</span>`;
+  }
+  btn.disabled=false;btn.textContent=o;
+}
+// 用 gpt-image-1 的 images/edits：附上去背產品照，依提示詞生成場景
+async function generateWithOpenAI(prompt,prodDataUrl,key,size){
+  const fd=new FormData();
+  fd.append('model','gpt-image-1');
+  fd.append('prompt',prompt);
+  fd.append('size',size||'1024x1024');
+  fd.append('image[]',dataURLtoBlob(prodDataUrl),'product.png');
+  const resp=await fetch('https://api.openai.com/v1/images/edits',{
+    method:'POST',headers:{'Authorization':'Bearer '+key},body:fd
+  });
+  const d=await resp.json();
+  if(d.error)throw new Error(d.error.message||'OpenAI 錯誤');
+  const item=d.data&&d.data[0];
+  if(item&&item.b64_json)return 'data:image/png;base64,'+item.b64_json;
+  if(item&&item.url)return item.url;
+  throw new Error('未取得圖片');
 }
 
 // ─── THEME DEFINITIONS ───
