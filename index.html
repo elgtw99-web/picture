@@ -306,7 +306,12 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
     <div id="oaiStatus" style="margin-top:.4rem;font-size:.62rem;display:none"></div>
   </div>
 
-  <button class="btn" id="promptBtn" onclick="doPrompts()">
+  <button class="btn" id="proBtn" onclick="doProLayout()">
+    <span id="proTxt">✦ 專業版面出圖（推薦）</span>
+    <div class="spin" id="sp3"></div>
+  </button>
+
+  <button class="btn" id="promptBtn" onclick="doPrompts()" style="margin-top:.6rem;background:transparent;border:1px solid rgba(196,153,42,.3);color:var(--g2)">
     <span id="promptTxt">✦ 產生 AI 出圖提示詞</span>
     <div class="spin" id="sp2"></div>
   </button>
@@ -670,8 +675,10 @@ async function analyze(ltxt,ttxt,limg){
 
 {
   "productName":"名稱",
+  "enName":"英文名或英文標語（可音譯，全大寫，用於版面副標）",
   "category":"品類",
   "tagline":"標語12字內",
+  "story":"優美行銷文案，45-75字，感性描述使用感受與情境，2-3句",
   "sellingPoints":["賣點1","賣點2","賣點3"],
   "ingredients":[{"name":"成分","benefit":"功效8字內","symbolChar":"單一unicode符號或漢字，如◈✿⬡◉❋◆▲●◇"}],
   "dreamScene":"使用後美好場景20字內",
@@ -958,6 +965,133 @@ async function genOneComposite(btn,i){
     box.innerHTML=`<span style="font-size:.66rem;color:rgba(220,120,120,.9)">合成失敗：${err.message}</span>`;
   }
   btn.disabled=false;btn.textContent=o;
+}
+
+// ─── 專業版面出圖：乾淨產品照層 + 精準文字層（像參考圖那種質感）───
+const PRO_PAL={
+  marble:{ink:'#3A3226',sub:'#9A8A6E',accent:'#B8912E',cream:'#F8F4ED',line:'#E6DCC9'},
+  ink:{ink:'#24303E',sub:'#64717E',accent:'#B99433',cream:'#F3F5F7',line:'#DCE3E8'},
+  rose:{ink:'#5A3B41',sub:'#B08A92',accent:'#C07A86',cream:'#FBF3F4',line:'#F0DEE1'},
+  botanical:{ink:'#33402F',sub:'#7B8C6E',accent:'#6FA25A',cream:'#F4F8F1',line:'#DDE9D6'},
+  noir:{ink:'#26241F',sub:'#8C8474',accent:'#C4992A',cream:'#F6F3EC',line:'#E4DECF'},
+  mist:{ink:'#2A3644',sub:'#6E7C8A',accent:'#6E88B4',cream:'#F2F5F9',line:'#DCE4EE'}
+};
+function _cover(ctx,img,x,y,w,h){
+  const s=Math.max(w/img.width,h/img.height),dw=img.width*s,dh=img.height*s;
+  ctx.save();ctx.beginPath();ctx.rect(x,y,w,h);ctx.clip();
+  ctx.drawImage(img,x+(w-dw)/2,y+(h-dh)/2,dw,dh);ctx.restore();
+}
+function _placeProd(ctx,pr,cx,baseY,ph){
+  const pw=ph*(pr.width/pr.height),px=cx-pw/2,py=baseY-ph;
+  const sy=baseY-ph*0.015;
+  ctx.save();const g=ctx.createRadialGradient(cx,sy,0,cx,sy,pw*0.55);
+  g.addColorStop(0,'rgba(0,0,0,0.22)');g.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=g;ctx.beginPath();ctx.ellipse(cx,sy,pw*0.44,ph*0.05,0,0,Math.PI*2);ctx.fill();ctx.restore();
+  ctx.save();ctx.shadowColor='rgba(0,0,0,0.16)';ctx.shadowBlur=ph*0.05;ctx.shadowOffsetY=ph*0.02;
+  ctx.drawImage(pr,px,py,pw,ph);ctx.restore();
+}
+function _fit(ctx,text,maxW,weight,family,startPx,minPx){
+  let s=startPx;do{ctx.font=`${weight} ${s}px ${family}`;if(ctx.measureText(text).width<=maxW)break;s-=2;}while(s>minPx);return s;
+}
+function _wrap(ctx,text,maxW){
+  const arr=[...(text||'')];let lines=[],cur='';
+  for(const ch of arr){const t=cur+ch;if(ctx.measureText(t).width>maxW&&cur){lines.push(cur);cur=ch;}else cur=t;}
+  if(cur)lines.push(cur);return lines;
+}
+function _feats(a){
+  if(a.painPoints&&a.painPoints.length)return a.painPoints.slice(0,3).map((p,i)=>({t:p.title,d:p.desc,sym:((a.ingredients||[])[i]||{}).symbolChar||'❋'}));
+  return (a.sellingPoints||[]).slice(0,3).map((s,i)=>({t:s,d:'',sym:((a.ingredients||[])[i]||{}).symbolChar||'✦'}));
+}
+function _drawFeatures(ctx,feats,x,y,colW,pal){
+  feats.forEach((f,i)=>{
+    const cx=x+colW*i+colW/2;
+    ctx.save();ctx.strokeStyle=pal.accent;ctx.lineWidth=1.3;ctx.beginPath();ctx.arc(cx,y,19,0,Math.PI*2);ctx.stroke();
+    ctx.fillStyle=pal.accent;ctx.font=`400 19px 'Noto Serif TC',serif`;ctx.textAlign='center';ctx.textBaseline='middle';ctx.fillText(f.sym||'❋',cx,y+1);ctx.restore();
+    ctx.textBaseline='alphabetic';ctx.textAlign='center';
+    ctx.fillStyle=pal.ink;ctx.font=`600 16px 'Noto Sans TC',sans-serif`;ctx.fillText((f.t||'').slice(0,7),cx,y+42);
+    if(f.d){ctx.fillStyle=pal.sub;ctx.font=`400 12px 'Noto Sans TC',sans-serif`;_wrap(ctx,f.d,colW-14).slice(0,2).forEach((ln,k)=>ctx.fillText(ln,cx,y+62+k*16));}
+  });
+}
+async function drawProLayout(bgUrl,prodUrl,a,orient){
+  const bg=await loadImg(bgUrl),pr=await loadImg(prodUrl);
+  const pal=PRO_PAL[curStyle]||PRO_PAL.marble;
+  const c=document.createElement('canvas');
+  const W=orient==='h'?1600:1080, H=orient==='h'?900:1350;
+  c.width=W;c.height=H;const ctx=c.getContext('2d');
+  ctx.fillStyle=pal.cream;ctx.fillRect(0,0,W,H);
+  try{ctx.letterSpacing='0px';}catch(e){}
+  if(orient==='h'){
+    const px0=W*0.47,pw=W-px0;
+    _cover(ctx,bg,px0,0,pw,H);
+    const gx=ctx.createLinearGradient(px0,0,px0+150,0);gx.addColorStop(0,pal.cream);gx.addColorStop(1,'rgba(0,0,0,0)');
+    ctx.fillStyle=gx;ctx.fillRect(px0,0,150,H);
+    _placeProd(ctx,pr,px0+pw*0.5,H*0.88,H*0.62);
+    const Lx=W*0.065,maxTW=px0-Lx-W*0.04;
+    ctx.textAlign='left';ctx.textBaseline='alphabetic';
+    let y=H*0.22;
+    const ts=_fit(ctx,a.productName||'',maxTW,'700',"'Noto Serif TC',serif",56,30);
+    ctx.fillStyle=pal.ink;ctx.font=`700 ${ts}px 'Noto Serif TC',serif`;ctx.fillText(a.productName||'',Lx,y);
+    if(a.enName){y+=34;try{ctx.letterSpacing='4px';}catch(e){}ctx.fillStyle=pal.sub;ctx.font=`400 20px 'Cormorant Garamond',serif`;ctx.fillText((a.enName||'').toUpperCase(),Lx,y);try{ctx.letterSpacing='0px';}catch(e){}}
+    y+=30;ctx.strokeStyle=pal.accent;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(Lx,y);ctx.lineTo(Lx+54,y);ctx.stroke();
+    y+=40;ctx.fillStyle=pal.ink;ctx.font=`500 22px 'Noto Serif TC',serif`;
+    _wrap(ctx,a.tagline||'',maxTW).slice(0,2).forEach(ln=>{ctx.fillText(ln,Lx,y);y+=32;});
+    y+=14;ctx.fillStyle=pal.sub;ctx.font=`400 16px 'Noto Sans TC',sans-serif`;
+    _wrap(ctx,a.story||a.dreamScene||'',maxTW).slice(0,5).forEach(ln=>{ctx.fillText(ln,Lx,y);y+=27;});
+    _drawFeatures(ctx,_feats(a),Lx,H*0.78,maxTW/3,pal);
+  }else{
+    const ph0=H*0.55;
+    _cover(ctx,bg,0,0,W,ph0);
+    const gy=ctx.createLinearGradient(0,ph0-150,0,ph0);gy.addColorStop(0,'rgba(0,0,0,0)');gy.addColorStop(1,pal.cream);
+    ctx.fillStyle=gy;ctx.fillRect(0,ph0-150,W,150);
+    _placeProd(ctx,pr,W*0.5,ph0*0.98,ph0*0.8);
+    const Lx=W*0.09,maxTW=W-Lx*2;
+    ctx.textAlign='center';ctx.textBaseline='alphabetic';
+    let y=ph0+H*0.075;
+    const ts=_fit(ctx,a.productName||'',maxTW,'700',"'Noto Serif TC',serif",50,28);
+    ctx.fillStyle=pal.ink;ctx.font=`700 ${ts}px 'Noto Serif TC',serif`;ctx.fillText(a.productName||'',W/2,y);
+    if(a.enName){y+=30;try{ctx.letterSpacing='4px';}catch(e){}ctx.fillStyle=pal.sub;ctx.font=`400 18px 'Cormorant Garamond',serif`;ctx.fillText((a.enName||'').toUpperCase(),W/2,y);try{ctx.letterSpacing='0px';}catch(e){}}
+    y+=28;ctx.strokeStyle=pal.accent;ctx.lineWidth=1.5;ctx.beginPath();ctx.moveTo(W/2-27,y);ctx.lineTo(W/2+27,y);ctx.stroke();
+    y+=38;ctx.fillStyle=pal.ink;ctx.font=`500 22px 'Noto Serif TC',serif`;
+    _wrap(ctx,a.tagline||'',maxTW).slice(0,2).forEach(ln=>{ctx.fillText(ln,W/2,y);y+=32;});
+    y+=10;ctx.fillStyle=pal.sub;ctx.font=`400 16px 'Noto Sans TC',sans-serif`;
+    _wrap(ctx,a.story||a.dreamScene||'',maxTW).slice(0,4).forEach(ln=>{ctx.fillText(ln,W/2,y);y+=27;});
+    _drawFeatures(ctx,_feats(a),Lx,H*0.9,maxTW/3,pal);
+  }
+  return c;
+}
+async function doProLayout(){
+  if(!prodImg){alert('請先上傳產品照片');return;}
+  const ltxt=document.getElementById('ltxt').value.trim();
+  const ttxt=document.getElementById('ttxt').value.trim();
+  if(!ltxt&&!labelImg){alert('請上傳標籤或輸入成分說明');return;}
+  if(!getOaiKey()){alert('請先輸入 OpenAI API Key');return;}
+  const btn=document.getElementById('proBtn');
+  btn.disabled=true;document.getElementById('proTxt').style.display='none';document.getElementById('sp3').style.display='block';
+  document.getElementById('emp').style.display='none';document.getElementById('pw').style.display='block';
+  document.getElementById('rg').style.display='none';document.getElementById('ana').style.display='none';
+  try{
+    try{await document.fonts.ready;}catch(e){}
+    prog(1,40,'Step 1 · AI 解析賣點與文案…');
+    aiData=await analyze(ltxt,ttxt,labelImg);
+    prog(1,100,'✓');showAna(aiData);
+    prog(2,30,'Step 2 · 去背產品…');
+    const cutout=await getCutoutProduct();
+    prog(2,100,'✓');
+    prog(3,20,'Step 3 · AI 生成自然場景（無產品無文字）…');
+    const ings=(aiData.ingredients||[]).map(i=>i.name).slice(0,3).join('、');
+    const proScene=`優雅的自然系產品情境：木質或石質檯面，柔和自然光灑落，${ings?('點綴與產品相關的天然元素，如'+ings+'及其花葉、果實'):'點綴清新的花葉與天然素材'}，背景柔焦、乾淨留白，高級雜誌質感。`;
+    const bg=await generateBackgroundOpenAI(bgPromptFrom({scene:proScene}),getOaiKey(),'1024x1024');
+    prog(3,100,'✓');
+    prog(4,30,'Step 4 · 套用專業版面（橫式＋直式）…');
+    const ch=await drawProLayout(bg,cutout,aiData,'h');
+    const cv=await drawProLayout(bg,cutout,aiData,'v');
+    prog(4,100,'✦ 完成！');
+    showResults([
+      {num:'01',title:'橫式 16:9',c:ch,cap:'官網 Banner／電商首圖'},
+      {num:'02',title:'直式 4:5',c:cv,cap:'IG 貼文／蝦皮'}
+    ]);
+  }catch(err){console.error(err);alert('版面生成失敗：'+err.message);}
+  btn.disabled=false;document.getElementById('proTxt').style.display='block';document.getElementById('sp3').style.display='none';
 }
 
 // ─── THEME DEFINITIONS ───
