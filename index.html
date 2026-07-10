@@ -340,6 +340,7 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
 <script>
 // ─── STATE ───
 let prodImg=null, origProdImg=null, labelImg=null, aiData=null;
+let prodCutout=false; // 產品是否已去背（透明）
 let curStyle='marble';
 let curPlat='shopee';
 let opts={icons:true,radial:true,deco:true,particles:true,tagline:true,specbar:false,darkprod:false};
@@ -415,6 +416,7 @@ function onPhoto(e){
   r.onload=ev=>{
     prodImg=ev.target.result;
     origProdImg=ev.target.result;
+    prodCutout=false;
     const p=document.getElementById('pp');
     p.src=prodImg;p.style.display='block';
     document.getElementById('pzt').textContent='已上傳 ✓';
@@ -452,6 +454,7 @@ async function doRemoveBg(){
       const reader=new FileReader();
       reader.onload=ev2=>{
         prodImg=ev2.target.result;
+        prodCutout=true;
         showBgResult(prodImg);
         status.style.color='rgba(122,200,122,.8)';
         status.textContent='✓ 去背完成（Remove.bg）';
@@ -467,6 +470,7 @@ async function doRemoveBg(){
     status.textContent='⏳ AI 分析去背中…';
     try{
       prodImg=await aiBgRemove(origProdImg);
+      prodCutout=true;
       showBgResult(prodImg);
       status.style.color='rgba(122,200,122,.8)';
       status.textContent='✓ AI 去背完成';
@@ -788,7 +792,7 @@ function renderPrompts(a){
   const g=document.getElementById('rg');
   g.innerHTML=`
     <div style="grid-column:1/-1;background:rgba(196,153,42,.08);border:1px solid rgba(196,153,42,.25);border-radius:10px;padding:.9rem 1rem;margin-bottom:.4rem;font-size:.72rem;line-height:1.7;color:#EBE3D2">
-      <b style="color:var(--g1)">📌 使用方式</b>　${hasOai?'可直接按每張的「✦ 自動出圖」，用 gpt-image-1 出圖。或複製提示詞到 ChatGPT / Sora 手動出圖。':'複製下方提示詞 → 到 ChatGPT / Sora → 先上傳產品照（去背可不去背皆可）→ 貼上提示詞送出。'}
+      <b style="color:var(--g1)">📌 使用方式</b>　${hasOai?'「✦ 自動出圖」＝gpt-image-1 直接生成（產品會被重繪、較像但非100%相同）。「🔒 鎖定產品合成」＝AI 只做背景，再把你的原始產品像素合成上去（產品一模一樣，推薦）。':'複製下方提示詞 → 到 ChatGPT / Sora → 先上傳產品照（去背可不去背皆可）→ 貼上提示詞送出。'}
       <div style="margin-top:.5rem">
         <button onclick="dlProd()" style="background:rgba(255,255,255,.06);border:1px solid rgba(196,153,42,.3);color:var(--g2);border-radius:6px;padding:.4rem .7rem;font-size:.66rem;cursor:pointer">⬇ 下載產品照（拿去附加）</button>
         <button onclick="copyAll()" style="background:rgba(255,255,255,.06);border:1px solid rgba(196,153,42,.3);color:var(--g2);border-radius:6px;padding:.4rem .7rem;font-size:.66rem;cursor:pointer;margin-left:.4rem">📋 複製全部四段</button>
@@ -806,6 +810,7 @@ function renderPrompts(a){
         <div style="display:flex;gap:.4rem">
           <button class="dlb" onclick="copyPrompt(this)">📋 複製</button>
           ${hasOai?`<button class="dlb" style="background:var(--g1);color:#1a1408" onclick="genOne(this,${i})">✦ 自動出圖</button>`:''}
+          ${hasOai?`<button class="dlb" style="background:#2a2015;color:var(--g1);border:1px solid var(--g1)" onclick="genOneComposite(this,${i})">🔒 鎖定產品合成</button>`:''}
         </div>
       </div>
       <div style="font-size:.62rem;color:rgba(168,144,112,.75);margin:.2rem 0 .5rem">${ip.focus||''}</div>
@@ -869,6 +874,8 @@ async function generateWithOpenAI(prompt,prodDataUrl,key,size){
   fd.append('model','gpt-image-1');
   fd.append('prompt',prompt);
   fd.append('size',size||'1024x1024');
+  fd.append('input_fidelity','high'); // 盡量保留產品外觀/logo/標籤特徵
+  fd.append('quality','high');
   fd.append('image[]',dataURLtoBlob(prodDataUrl),'product.png');
   const resp=await fetch('https://api.openai.com/v1/images/edits',{
     method:'POST',headers:{'Authorization':'Bearer '+key},body:fd
@@ -879,6 +886,75 @@ async function generateWithOpenAI(prompt,prodDataUrl,key,size){
   if(item&&item.b64_json)return 'data:image/png;base64,'+item.b64_json;
   if(item&&item.url)return item.url;
   throw new Error('未取得圖片');
+}
+
+// ─── 解法二：鎖定產品·合成出圖（AI 只做背景，產品用你的原始像素合成）───
+async function getCutoutProduct(){
+  if(prodCutout&&prodImg)return prodImg;          // 已去背就直接用
+  return await aiBgRemove(origProdImg||prodImg);  // 否則自動去背取得透明產品
+}
+function bgPromptFrom(ip){
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  const styleDesc=STYLE_DESC[curStyle]||STYLE_DESC.marble;
+  const scene=(ip&&ip.scene)||'柔和的商業攝影棚場景';
+  return `為商業產品行銷圖生成一張「只有背景場景、不含任何產品」的圖片。${scene}
+整體視覺風格：${styleDesc}。畫面中央（或稍偏一側）保留一塊乾淨、平整、光線柔和的空白平台／檯面，稍後會把產品放上去；絕對不要在圖中畫出任何瓶罐、盒子、包裝或商品。若出現人物或手部，一律以亞洲（東亞／台灣）面孔與膚色為主。${plat.layout}。高解析度、光影真實、無文字浮水印。`;
+}
+async function generateBackgroundOpenAI(prompt,key,size){
+  const resp=await fetch('https://api.openai.com/v1/images/generations',{
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:'gpt-image-1',prompt,size:size||'1024x1024',quality:'high'})
+  });
+  const d=await resp.json();
+  if(d.error)throw new Error(d.error.message||'OpenAI 錯誤');
+  const item=d.data&&d.data[0];
+  if(item&&item.b64_json)return 'data:image/png;base64,'+item.b64_json;
+  if(item&&item.url)return item.url;
+  throw new Error('未取得背景圖');
+}
+async function compositeProduct(bgUrl,prodUrl,size){
+  const [W,H]=(size||'1024x1024').split('x').map(Number);
+  const c=document.createElement('canvas');c.width=W;c.height=H;
+  const ctx=c.getContext('2d');
+  const bg=await loadImg(bgUrl);
+  const s=Math.max(W/bg.width,H/bg.height);           // 背景鋪滿（cover）
+  ctx.drawImage(bg,(W-bg.width*s)/2,(H-bg.height*s)/2,bg.width*s,bg.height*s);
+  const pr=await loadImg(prodUrl);
+  const ph=H*0.62, pw=ph*(pr.width/pr.height);        // 產品約佔畫面高 62%
+  const px=(W-pw)/2, py=(H-ph)/2+H*0.03;
+  // 接觸陰影：先在底部畫一道柔和橢圓陰影
+  ctx.save();
+  const shY=py+ph*0.98;
+  const sg=ctx.createRadialGradient(W/2,shY,0,W/2,shY,pw*0.5);
+  sg.addColorStop(0,'rgba(0,0,0,0.30)');sg.addColorStop(1,'rgba(0,0,0,0)');
+  ctx.fillStyle=sg;ctx.beginPath();ctx.ellipse(W/2,shY,pw*0.42,ph*0.06,0,0,Math.PI*2);ctx.fill();
+  ctx.restore();
+  // 產品本體（帶投影提升真實感）
+  ctx.save();
+  ctx.shadowColor='rgba(0,0,0,0.22)';ctx.shadowBlur=W*0.03;ctx.shadowOffsetY=H*0.012;
+  ctx.drawImage(pr,px,py,pw,ph);
+  ctx.restore();
+  return c.toDataURL('image/png');
+}
+async function genOneComposite(btn,i){
+  const key=getOaiKey();
+  if(!key){alert('請先填入 OpenAI API Key');return;}
+  const card=btn.closest('.ic');
+  const box=card.querySelector('.oaiResult');
+  const plat=PLATFORMS[curPlat]||PLATFORMS.shopee;
+  const ip=(aiData&&aiData.imagePrompts&&aiData.imagePrompts[i])||null;
+  btn.disabled=true;const o=btn.textContent;btn.textContent='合成中…';
+  box.innerHTML='<span style="font-size:.66rem;color:rgba(168,144,112,.8)">① 去背產品 → ② AI 生成背景 → ③ 合成…約 20-45 秒</span>';
+  try{
+    const cutout=await getCutoutProduct();
+    const bg=await generateBackgroundOpenAI(bgPromptFrom(ip),key,plat.apiSize||'1024x1024');
+    const out=await compositeProduct(bg,cutout,plat.apiSize||'1024x1024');
+    box.innerHTML=`<img src="${out}" style="width:100%;border-radius:8px;border:1px solid rgba(196,153,42,.2)"><a download="依洛嘉_合成0${i+1}.png" href="${out}" class="dlb" style="display:inline-block;margin-top:.5rem;text-decoration:none">下載 PNG</a><div style="font-size:.6rem;color:rgba(122,200,122,.85);margin-top:.35rem">🔒 產品為你上傳的原始像素，未經 AI 改動</div>`;
+  }catch(err){
+    box.innerHTML=`<span style="font-size:.66rem;color:rgba(220,120,120,.9)">合成失敗：${err.message}</span>`;
+  }
+  btn.disabled=false;btn.textContent=o;
 }
 
 // ─── THEME DEFINITIONS ───
