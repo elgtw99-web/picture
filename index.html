@@ -709,14 +709,27 @@ async function analyze(ltxt,ttxt,limg){
 }`});
   const key=getKey();
   if(!key){throw new Error('請先輸入 Anthropic API Key');}
-  const resp=await fetch('https://picture.elg-tw99.workers.dev/',{
-    method:'POST',
-    headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
-    body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:900,messages:[{role:'user',content:uc}]})
-  });
-  const d=await resp.json();
+  let resp;
+  try{
+    resp=await fetch('https://picture.elg-tw99.workers.dev/',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','x-api-key':key,'anthropic-version':'2023-06-01'},
+      body:JSON.stringify({model:'claude-sonnet-4-20250514',max_tokens:2000,messages:[{role:'user',content:uc}]})
+    });
+  }catch(e){throw new Error('無法連線到分析伺服器，請檢查網路後再試');}
+  let d;
+  try{d=await resp.json();}catch(e){throw new Error('伺服器回應異常（HTTP '+resp.status+'）');}
+  // API 回錯或沒有內容時，顯示真正原因而不是 undefined.map
+  if(!resp.ok||d.error||!Array.isArray(d.content)){
+    const msg=(d&&d.error&&(d.error.message||d.error.type))||d.message||('HTTP '+resp.status);
+    throw new Error(msg+'（請確認 Anthropic API Key 正確、格式為 sk-ant-… 且帳戶有額度）');
+  }
   const txt=d.content.map(b=>b.text||'').join('');
-  return JSON.parse(txt.replace(/```json|```/g,'').trim());
+  try{
+    return JSON.parse(txt.replace(/```json|```/g,'').trim());
+  }catch(e){
+    throw new Error('AI 回傳的內容無法解析（可能被截斷），請再試一次');
+  }
 }
 function showAna(a){
   document.getElementById('sc').innerHTML=(a.sellingPoints||[]).map(s=>`<span class="chip">✦ ${s}</span>`).join('');
