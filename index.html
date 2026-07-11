@@ -157,6 +157,11 @@ textarea::placeholder{color:rgba(168,144,112,.5)}
           <div style="font-size:.56rem;opacity:.65;margin-top:.15rem">每月50次免費</div>
           <div style="font-size:.54rem;opacity:.45">★★★★★</div>
         </div>
+        <div class="rmbg-opt" id="mGpt" onclick="pickMethod('gpt')">
+          ✨ gpt-image-1 去背
+          <div style="font-size:.56rem;opacity:.65;margin-top:.15rem">複雜背景最乾淨・用 OpenAI 金鑰</div>
+          <div style="font-size:.54rem;opacity:.45">★★★★★</div>
+        </div>
       </div>
 
       <!-- Remove.bg key input -->
@@ -388,6 +393,7 @@ function pickMethod(m){
   bgMethod=m;
   document.getElementById('mAI').classList.toggle('on',m==='ai');
   document.getElementById('mRmbg').classList.toggle('on',m==='rmbg');
+  const g=document.getElementById('mGpt');if(g)g.classList.toggle('on',m==='gpt');
   document.getElementById('rmbgKeyWrap').style.display=m==='rmbg'?'block':'none';
 }
 function saveRmbgKey(v){
@@ -470,8 +476,24 @@ async function doRemoveBg(){
       status.textContent='✗ 失敗：'+err.message;
       btn.disabled=false;
     }
+  } else if(bgMethod==='gpt'){
+    // gpt-image-1 去背（透明底，複雜/印花背景最乾淨；會用 AI 重繪產品）
+    const key=getOaiKey();
+    if(!key){alert('請先輸入 OpenAI API Key（第 07 欄）');btn.disabled=false;return;}
+    status.textContent='⏳ gpt-image-1 去背中（約 15-40 秒）…';
+    try{
+      prodImg=await gptImageRemoveBg(origProdImg,key);
+      prodCutout=true;
+      showBgResult(prodImg);
+      status.style.color='rgba(122,200,122,.8)';
+      status.textContent='✓ 去背完成（gpt-image-1）';
+    }catch(err){
+      status.style.color='rgba(200,100,100,.8)';
+      status.textContent='✗ 失敗：'+err.message;
+    }
+    btn.disabled=false;
   } else {
-    // AI去背 using Canvas + Claude Vision to mask
+    // AI去背（本機 @imgly）
     status.textContent='⏳ 本機 AI 去背中（首次需下載模型，約數十秒）…';
     try{
       prodImg=await aiBgRemove(origProdImg);
@@ -509,6 +531,24 @@ async function aiBgRemove(src){
   const {removeBackground}=await loadImgly();
   const blob=await removeBackground(src,{output:{format:'image/png'}});
   return await new Promise((res,rej)=>{const r=new FileReader();r.onload=()=>res(r.result);r.onerror=rej;r.readAsDataURL(blob);});
+}
+// gpt-image-1 去背：輸出透明底 PNG（會用 AI 重繪，對複雜/印花背景最乾淨）
+async function gptImageRemoveBg(src,key){
+  const fd=new FormData();
+  fd.append('model','gpt-image-1');
+  fd.append('prompt','Remove the background completely and keep ONLY the main product exactly as it is, with no background, no props, no extra shadow, no added text or logo. Output the isolated product on a fully transparent background.');
+  fd.append('image[]',dataURLtoBlob(src),'product.png');
+  fd.append('background','transparent');
+  fd.append('output_format','png');
+  fd.append('input_fidelity','high');
+  fd.append('size','auto');
+  const resp=await fetch('https://api.openai.com/v1/images/edits',{method:'POST',headers:{'Authorization':'Bearer '+key},body:fd});
+  const d=await resp.json();
+  if(d.error)throw new Error(d.error.message||'OpenAI 錯誤');
+  const item=d.data&&d.data[0];
+  if(item&&item.b64_json)return 'data:image/png;base64,'+item.b64_json;
+  if(item&&item.url)return item.url;
+  throw new Error('未取得去背圖');
 }
 function onLabel(e){
   const f=e.target.files[0];if(!f)return;
